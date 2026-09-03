@@ -93,3 +93,15 @@ Optional `.env` override: `BASE_URL`, `QA_TEST_OTP` (see `.env.example`).
 - **Artifacts** — download `allure-report-combined` / per-browser artifacts; open `index.html`
 - **publish-allure job → Summary** — GitHub Pages URL when Pages is configured (main only)
 - **Traces** — from the artifact / Allure attachment, run `npx playwright show-trace <file.zip>`
+
+### One-time GitHub Pages setup (Allure live URL)
+
+The combined Allure report is always uploaded as the **`allure-report-combined`** artifact. To also publish a browsable URL on every `main` push:
+
+1. Open **Settings → Pages** on the repository
+2. Under **Build and deployment**, set **Source** to **GitHub Actions**
+3. Re-run CI (or push a new commit to `main`)
+
+Expected URL: `https://<owner>.github.io/<repo>/` (for example `https://saurabhsrana.github.io/qa_automation/`)
+
+Until Pages is enabled, the **Publish Allure (GitHub Pages)** job shows setup instructions in its Job Summary; the report itself is still available from artifacts.

@@ -228,9 +228,9 @@ jobs:
         uses: actions/cache@v4
         with:
           path: reports/allure-history
-          key: allure-history-${{ github.ref_name }}-${{ github.run_id }}
+          # Stable key per branch so Trend charts persist across CI runs.
+          key: allure-history-${{ github.ref_name }}
           restore-keys: |
-            allure-history-${{ github.ref_name }}-
             allure-history-
 
       - name: Download Allure results from all browsers
@@ -316,6 +316,10 @@ jobs:
             echo ""
             if [ "$IS_MAIN_PUSH" = "true" ]; then
               echo "GitHub Pages deploy runs next (main push only)."
+              echo ""
+              echo "Expected live URL (after one-time Pages setup): \`https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/\`"
+              echo ""
+              echo "If Pages is not enabled yet: **Settings → Pages → Source: GitHub Actions**, then re-run CI."
             else
               echo "Pages deploy skipped on PR runs — see the **allure-report-combined** build artifact above."
               echo ""
@@ -398,25 +402,37 @@ jobs:
           name: allure-report-combined
           path: artifact
 
+      - name: Prepare Allure site for GitHub Pages
+        run: |
+          # Prevent Jekyll from stripping Allure assets (underscore paths, etc.).
+          touch artifact/.nojekyll
+          test -f artifact/index.html
+
       - name: Setup Pages
         id: pages
         uses: actions/configure-pages@v5
+        continue-on-error: true
 
       - name: Upload Allure site
         id: upload
+        if: steps.pages.outcome == 'success'
         uses: actions/upload-pages-artifact@v3
         with:
           path: artifact
 
       - name: Deploy to GitHub Pages
         id: deployment
+        if: steps.pages.outcome == 'success'
         uses: actions/deploy-pages@v4
 
       - name: Allure report URL
         if: always()
         env:
+          PAGES_OUTCOME: ${{ steps.pages.outcome }}
           DEPLOY_OUTCOME: ${{ steps.deployment.outcome }}
           PAGE_URL: ${{ steps.deployment.outputs.page_url }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          EXPECTED_PAGE_URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/
         run: |
           {
             echo "## Allure report publish"
@@ -427,8 +443,23 @@ jobs:
               echo "[Open Allure report]($PAGE_URL)"
               echo ""
               echo "Raw URL: \`$PAGE_URL\`"
+            elif [ "$PAGES_OUTCOME" != "success" ]; then
+              echo "GitHub Pages is **not enabled** for this repository yet."
+              echo ""
+              echo "### One-time setup (required for live URL)"
+              echo "1. Open [Repository Settings → Pages](https://github.com/${{ github.repository }}/settings/pages)"
+              echo "2. Under **Build and deployment**, set **Source** to **GitHub Actions**"
+              echo "3. Re-run this workflow or push a new commit to \`main\`"
+              echo ""
+              echo "Expected URL after setup: \`$EXPECTED_PAGE_URL\`"
+              echo ""
+              echo "### Report available now (artifact)"
+              echo "Download [\`allure-report-combined\`]($RUN_URL#artifacts), unzip, and open \`index.html\`."
             else
               echo "GitHub Pages deploy did not succeed (outcome: \`${DEPLOY_OUTCOME:-unknown}\`)."
-              echo "Download **allure-report-combined** from this run’s artifacts."
+              echo "Download **allure-report-combined** from [this run’s artifacts]($RUN_URL#artifacts)."
             fi
           } >> "$GITHUB_STEP_SUMMARY"
+          if [ "$PAGES_OUTCOME" != "success" ]; then
+            echo "::warning title=GitHub Pages not enabled::Enable Pages (Settings → Pages → GitHub Actions source) to publish the Allure report URL. The allure-report-combined artifact is still available."
+          fi
