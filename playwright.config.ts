@@ -1,7 +1,9 @@
 import os from "node:os";
 import { defineConfig, devices } from "@playwright/test";
-import config from "./src/config";
+import { getEnvironmentConfig } from "./src/config/environmentResolver";
 import { shouldRunHeadless } from "./src/config/browser.factory";
+
+const config = getEnvironmentConfig();
 
 const uiTestDir = "./tests/ui";
 
@@ -32,6 +34,7 @@ if (process.env.INCLUDE_WEBKIT === "true") {
  * API folder reserved (empty). WebKit: set INCLUDE_WEBKIT=true or npm run test:webkit.
  */
 export default defineConfig({
+  globalSetup: "./tests/global-setup.ts",
   timeout: 180_000,
   expect: { timeout: 60_000 },
   fullyParallel: false,
@@ -54,7 +57,7 @@ export default defineConfig({
           os_release: os.release(),
           node_version: process.version,
           browser: process.env.BROWSER || "chromium",
-          test_env: process.env.TEST_ENV || "dev",
+          test_env: config.env,
         },
       },
     ],

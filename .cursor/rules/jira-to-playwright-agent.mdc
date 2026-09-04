@@ -11,7 +11,7 @@ When the user invokes **Jira-to-Playwright Agent** or asks to automate a Jira st
 2. Execute STEPS 1–9 in order — do not skip framework inspection (STEP 5)
 3. Write artifacts:
    - Prefer Playwright Test: extend `tests/ui/` or add `tests/ui/{STORY-KEY}.spec.ts` (+ page objects under `src/page-objects/` only when needed)
-   - Tag with `allure.tms` / `TC-<github-issue-number>` for Allure → GitHub Issues linkage
+   - Use clear, descriptive `test()` titles and `test.step()` names (no `allure.tms`, no `TC-*` tags); optional functional `allure.tags(...)` only (e.g. smoke, regression)
    - `qa-report-{STORY-KEY}.md` when requested
 4. Coverage gate: ≥95% before STEP 6
 5. Heal loop: max 3 retries after Playwright Test

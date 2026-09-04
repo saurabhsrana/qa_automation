@@ -1,5 +1,5 @@
 import * as allure from "allure-js-commons";
-import { test } from "../../src/fixtures/loyalty.fixture";
+import { test } from "../../src/fixtures/enrollment.fixture";
 import {
   profileDataSets,
   resolveUniquePhone,
@@ -8,7 +8,7 @@ import {
 } from "../../src/utils/testData";
 
 /**
- * Converted from features/completeprofile.feature (@TC-2).
+ * Converted from the original Cucumber features/completeprofile.feature.
  * Examples row kept as a one-item array for future data-driven extension.
  */
 test.describe("Revance complete profile", () => {
@@ -23,14 +23,7 @@ test.describe("Revance complete profile", () => {
       await allure.story(
         "User completes sign-up, profile questions, and sees the rewards dashboard",
       );
-      await allure.tms("2", "Test Case #2");
-      await allure.tags(
-        "completeprofile",
-        "loyaltyProfile",
-        "smoke",
-        "regression",
-        "TC-2",
-      );
+      await allure.tags("completeprofile", "smoke", "regression");
 
       await test.step("I am on the Revance Welcome page", async () => {
         await welcomePage.goto();

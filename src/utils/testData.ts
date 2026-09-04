@@ -1,7 +1,7 @@
 /**
  * Dynamic test-data helpers. Static values live in `src/data/constants.json`.
  */
-import config from "../config";
+import { getEnvironmentConfig } from "../config/environmentResolver";
 import constants from "../data/constants.json";
 
 /** UNIQUE → fresh 10-digit test phone so signup is not skipped for an existing account. */
@@ -20,17 +20,18 @@ export function uniqueEmailForPhone(email: string, phone?: string): string {
 }
 
 /**
- * QA harness OTP — from src/config/env.{TEST_ENV}.ts (`otp`) with optional QA_TEST_OTP override.
+ * Harness OTP — from getEnvironmentConfig() with optional QA_TEST_OTP / SIGNUP_OTP override.
  * SIGNUP_OTP is accepted as a legacy env alias.
  */
 export function resolveTestOtp(): string {
-  const otp = config.otp?.trim() || "";
-  if (!otp) {
+  const { env, otp } = getEnvironmentConfig();
+  const resolved = otp.trim();
+  if (!resolved) {
     throw new Error(
-      "OTP is not configured. Set otp in src/config/env.{TEST_ENV}.ts or QA_TEST_OTP in .env.",
+      `OTP is not configured for TEST_ENV=${env}. Set otp in src/config/environments/${env}.config.ts or QA_TEST_OTP in .env.`,
     );
   }
-  return otp;
+  return resolved;
 }
 
 /** Welcome page expected heading (from constants.json). */
