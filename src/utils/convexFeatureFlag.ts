@@ -1,8 +1,13 @@
 import { spawnSync } from "node:child_process";
+import path from "node:path";
 import { getEnvironmentConfig } from "../config/environmentResolver";
 
 /** Enrollment flow requires this Convex env var during test execution. */
 export const ENROLLMENT_AUTOMATION_FLAG = "FEATURE_AUTOMATION_ENABLED";
+
+const CONVEX_CLI = path.join(process.cwd(), "node_modules", "convex", "bin", "main.js");
+const UNKNOWN_EXIT = "unknown";
+const UNKNOWN_ERROR = "unknown error";
 
 function resolveDeploymentLabel(): string {
   const config = getEnvironmentConfig();
@@ -21,7 +26,7 @@ function resolveDeploymentLabel(): string {
 }
 
 /**
- * Env passed to `npx convex`.
+ * Env passed to the Convex CLI.
  *
  * Auth (per Convex docs):
  * - Local: `npx convex login` (interactive) — no CONVEX_DEPLOY_KEY required.
@@ -40,18 +45,26 @@ function convexProcessEnv(): NodeJS.ProcessEnv {
   };
 }
 
+function formatCliFailure(
+  operation: string,
+  deployment: string,
+  status: number | null,
+  detail: string,
+): string {
+  return `[convex] ${operation} failed on ${deployment} (exit ${status ?? UNKNOWN_EXIT}): ${detail || UNKNOWN_ERROR}`;
+}
+
 function runConvexCli(
   args: string[],
   operation: string,
 ): { stdout: string; stderr: string; status: number | null } {
   const deployment = resolveDeploymentLabel();
-  const cliArgs = ["convex", ...args, "--deployment", deployment];
+  const cliArgs = [...args, "--deployment", deployment];
 
-  const result = spawnSync("npx", cliArgs, {
+  const result = spawnSync(process.execPath, [CONVEX_CLI, ...cliArgs], {
     cwd: process.cwd(),
     env: convexProcessEnv(),
     encoding: "utf8",
-    shell: true,
   });
 
   if (result.error) {
@@ -74,7 +87,7 @@ function isUnsetVariableError(stderr: string, stdout: string): boolean {
   );
 }
 
-/** Reads the current Convex env var value via `npx convex env get`. */
+/** Reads the current Convex env var value via the Convex CLI `env get`. */
 export async function getFeatureFlag(name: string): Promise<string> {
   const deployment = resolveDeploymentLabel();
   const { stdout, stderr, status } = runConvexCli(
@@ -91,11 +104,16 @@ export async function getFeatureFlag(name: string): Promise<string> {
   }
 
   throw new Error(
-    `[convex] getFeatureFlag(${name}) failed on ${deployment} (exit ${status ?? "unknown"}): ${stderr || stdout || "unknown error"}`,
+    formatCliFailure(
+      `getFeatureFlag(${name})`,
+      deployment,
+      status,
+      stderr || stdout,
+    ),
   );
 }
 
-/** Sets a Convex env var via `npx convex env set`. */
+/** Sets a Convex env var via the Convex CLI `env set`. */
 export async function setFeatureFlag(
   name: string,
   value: string,
@@ -108,12 +126,17 @@ export async function setFeatureFlag(
 
   if (status !== 0) {
     throw new Error(
-      `[convex] setFeatureFlag(${name}=${value}) failed on ${deployment} (exit ${status ?? "unknown"}): ${stderr || "unknown error"}`,
+      formatCliFailure(
+        `setFeatureFlag(${name}=${value})`,
+        deployment,
+        status,
+        stderr,
+      ),
     );
   }
 }
 
-/** Unsets a Convex env var via `npx convex env remove` (restore prior unset state). */
+/** Unsets a Convex env var via the Convex CLI `env remove` (restore prior unset state). */
 export async function removeFeatureFlag(name: string): Promise<void> {
   const deployment = resolveDeploymentLabel();
   const { stderr, status } = runConvexCli(
@@ -123,7 +146,12 @@ export async function removeFeatureFlag(name: string): Promise<void> {
 
   if (status !== 0) {
     throw new Error(
-      `[convex] removeFeatureFlag(${name}) failed on ${deployment} (exit ${status ?? "unknown"}): ${stderr || "unknown error"}`,
+      formatCliFailure(
+        `removeFeatureFlag(${name})`,
+        deployment,
+        status,
+        stderr,
+      ),
     );
   }
 }
@@ -139,7 +167,7 @@ export async function enableEnrollmentAutomationForRun(): Promise<{
   const deployment = resolveDeploymentLabel();
   const originalValue = await getFeatureFlag(ENROLLMENT_AUTOMATION_FLAG);
 
-  console.log(
+  console.warn(
     `Setting ${ENROLLMENT_AUTOMATION_FLAG}=true on ${deployment} before enrollment tests (original=${originalValue || "(unset)"})`,
   );
   await setFeatureFlag(ENROLLMENT_AUTOMATION_FLAG, "true");
@@ -148,14 +176,14 @@ export async function enableEnrollmentAutomationForRun(): Promise<{
     originalValue,
     restore: async () => {
       if (originalValue === "") {
-        console.log(
+        console.warn(
           `Restored ${ENROLLMENT_AUTOMATION_FLAG}=(unset) on ${deployment} after enrollment tests`,
         );
         await removeFeatureFlag(ENROLLMENT_AUTOMATION_FLAG);
         return;
       }
 
-      console.log(
+      console.warn(
         `Restored ${ENROLLMENT_AUTOMATION_FLAG}=${originalValue} on ${deployment} after enrollment tests`,
       );
       await setFeatureFlag(ENROLLMENT_AUTOMATION_FLAG, originalValue);

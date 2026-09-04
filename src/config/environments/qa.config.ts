@@ -12,7 +12,7 @@ const qaConfig: EnvironmentConfig = {
   ocePassword: process.env.OCE_PASSWORD?.trim() || "",
   ocePractice: process.env.OCE_PRACTICE?.trim() || "Pleasanton Dermatology",
   oceLocation: process.env.OCE_LOCATION?.trim() || "Pleasanton - CA",
-  // TODO: set from Convex dashboard → QA deployment name (Settings → deployment slug).
+  // QA Convex deployment slug (Convex dashboard → Settings → deployment name).
   convexDeployment: "dev/abhimanu-sharma",
 };
 

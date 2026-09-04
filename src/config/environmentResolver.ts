@@ -117,7 +117,7 @@ export function logEnvironmentStartup(): void {
   const config = getEnvironmentConfig();
   const label = config.env.toUpperCase();
 
-  console.log(`\nRunning against: ${label} (${config.baseUrl})\n`);
+  console.warn(`\nRunning against: ${label} (${config.baseUrl})\n`);
 
   if (config.baseUrlOverrideActive) {
     console.warn(

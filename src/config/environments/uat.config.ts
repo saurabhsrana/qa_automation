@@ -12,7 +12,7 @@ const uatConfig: EnvironmentConfig = {
   ocePassword: process.env.OCE_PASSWORD?.trim() || "",
   ocePractice: process.env.OCE_PRACTICE?.trim() || "Dauwe Plastic Surgery",
   oceLocation: process.env.OCE_LOCATION?.trim() || "Dallas-TX-10707",
-  // TODO: set from Convex dashboard → UAT deployment name (Settings → deployment slug).
+  // UAT Convex deployment slug — set when provisioned, or override via CONVEX_DEPLOYMENT in .env.
   convexDeployment: "",
 };
 

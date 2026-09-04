@@ -13,7 +13,7 @@ type EnrollmentFixtures = {
  */
 export const test = loyaltyTest.extend<EnrollmentFixtures>({
   _enrollmentAutomationFlag: [
-    async ({}, use) => {
+    async (_fixtures, use) => {
       const session = await enableEnrollmentAutomationForRun();
       try {
         await use(undefined);
