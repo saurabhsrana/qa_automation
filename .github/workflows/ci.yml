@@ -1,9 +1,10 @@
 # Loyalty test automation CI
 #
 # Triggers:
-#   - Push to main/master → full pipeline (lint + E2E + Allure + Pages)
-#   - Pull request → Lint & typecheck always; E2E only with ready-for-e2e label
-#   - Manual run: GitHub → Actions → CI → Run workflow
+#   - Push to main/master → full regression suite (lint + E2E + Allure + Pages)
+#   - Push to develop → smoke only (@smoke)
+#   - Pull request → Lint & typecheck always; E2E smoke only with ready-for-e2e label
+#   - Manual run: GitHub → Actions → CI → Run workflow (optional test_filter --grep)
 #
 # E2E tests hit a shared QA environment, so on PRs they are gated behind the
 # ready-for-e2e label to avoid multiple PRs colliding on shared test data.
@@ -19,6 +20,7 @@
 # After a run:
 #   - Playwright UI (chromium|firefox) jobs → Summary + per-browser artifacts
 #   - publish-allure → merges Allure results from all browsers, then GitHub Pages URL
+#     (Pages deploy is main/master push only — develop never publishes the live report)
 #   - Manual "Run workflow" can set enable_video=true (sets PW_VIDEO=on) when motion matters
 #
 # Artifact retention: keep upload-artifact retention-days in sync (default 14 below).
@@ -37,6 +39,10 @@ on:
         description: Record video on failure (larger artifacts; for animation/drag-drop debugging)
         type: boolean
         default: false
+      test_filter:
+        description: Playwright --grep (e.g. @smoke, @regression). Leave empty for the full suite.
+        type: string
+        default: ''
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
@@ -101,6 +107,31 @@ jobs:
       - name: Reset Allure folders
         run: npm run allure:clean
 
+      - name: Resolve Playwright grep
+        id: grep
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          REF_NAME: ${{ github.ref }}
+          MANUAL_FILTER: ${{ inputs.test_filter }}
+        run: |
+          FILTER=""
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            FILTER="$MANUAL_FILTER"
+          elif [ "$EVENT_NAME" = "pull_request" ]; then
+            FILTER="@smoke"
+          elif [ "$REF_NAME" = "refs/heads/develop" ]; then
+            FILTER="@smoke"
+          fi
+          {
+            echo "filter=$FILTER"
+          } >> "$GITHUB_OUTPUT"
+          {
+            echo "## Playwright filter"
+            echo ""
+            echo "- Event: \`$EVENT_NAME\`"
+            echo "- Grep: \`${FILTER:-<all tests>}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Log QA config source
         run: |
           {
@@ -126,14 +157,19 @@ jobs:
           CONVEX_DEPLOY_KEY_UAT: ${{ secrets.CONVEX_DEPLOY_KEY_UAT }}
           # push/PR: inputs.enable_video is unset → off. Manual run: enable_video checkbox.
           PW_VIDEO: ${{ inputs.enable_video == true && 'on' || 'off' }}
+          PW_GREP: ${{ steps.grep.outputs.filter }}
         run: |
           set -o pipefail
+          GREP_ARGS=()
+          if [ -n "$PW_GREP" ]; then
+            GREP_ARGS=(--grep "$PW_GREP")
+          fi
           {
             echo "### Playwright --list"
-            npx playwright test --project=${{ matrix.browser }} --list || true
+            npx playwright test --project=${{ matrix.browser }} --list "${GREP_ARGS[@]}" || true
             echo ""
             echo "### Playwright run"
-            npx playwright test --project=${{ matrix.browser }} --retries=1
+            npx playwright test --project=${{ matrix.browser }} --retries=1 "${GREP_ARGS[@]}"
           } 2>&1 | tee playwright-ci.log
           status=${PIPESTATUS[0]}
           {
