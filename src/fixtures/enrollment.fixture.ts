@@ -13,7 +13,8 @@ type EnrollmentFixtures = {
  */
 export const test = loyaltyTest.extend<EnrollmentFixtures>({
   _enrollmentAutomationFlag: [
-    async (_fixtures, use) => {
+    // eslint-disable-next-line no-empty-pattern -- Convex toggle has no upstream fixture deps
+    async ({}, use) => {
       const session = await enableEnrollmentAutomationForRun();
       try {
         await use(undefined);

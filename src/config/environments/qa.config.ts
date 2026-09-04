@@ -13,7 +13,7 @@ const qaConfig: EnvironmentConfig = {
   ocePractice: process.env.OCE_PRACTICE?.trim() || "Pleasanton Dermatology",
   oceLocation: process.env.OCE_LOCATION?.trim() || "Pleasanton - CA",
   // QA Convex deployment slug (Convex dashboard → Settings → deployment name).
-  convexDeployment: "dev/abhimanu-sharma",
+  convexDeployment: "industrious-trout-712",
 };
 
 export default qaConfig;
