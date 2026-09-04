@@ -32,22 +32,44 @@ function resolveDeploymentLabel(): string {
 }
 
 /**
+ * Deploy key for the active TEST_ENV. Convex CLI only reads CONVEX_DEPLOY_KEY,
+ * so env-specific secrets are mapped here:
+ *   qa  → CONVEX_DEPLOY_KEY_QA
+ *   uat → CONVEX_DEPLOY_KEY_UAT
+ * Generic CONVEX_DEPLOY_KEY is a fallback (local / older CI).
+ */
+function resolveConvexDeployKey(): string | undefined {
+  const env = getEnvironmentConfig().env;
+  const envSpecificKey = {
+    qa: process.env.CONVEX_DEPLOY_KEY_QA,
+    uat: process.env.CONVEX_DEPLOY_KEY_UAT,
+    dev: process.env.CONVEX_DEPLOY_KEY_DEV,
+  }[env];
+  const resolved =
+    envSpecificKey?.trim() || process.env.CONVEX_DEPLOY_KEY?.trim() || "";
+  return resolved || undefined;
+}
+
+/**
  * Env passed to the Convex CLI.
  *
  * Auth (per Convex docs):
- * - Local: `npx convex login` (interactive) — no CONVEX_DEPLOY_KEY required.
- * - CI/scripts: set CONVEX_DEPLOY_KEY — CLI auto-detects it (no separate flag).
+ * - Local: `npx convex login` (interactive) — no deploy key required.
+ * - CI/scripts: set CONVEX_DEPLOY_KEY_QA / CONVEX_DEPLOY_KEY_UAT — mapped to
+ *   CONVEX_DEPLOY_KEY for the CLI (no separate flag).
  *   https://docs.convex.dev/cli/deploy-key-types
  *
  * Target deployment: `--deployment <name>` on each command, plus CONVEX_DEPLOYMENT
- * for local sessions. When CONVEX_DEPLOY_KEY is set, it must belong to the same
- * deployment as convexDeployment / CONVEX_DEPLOYMENT or CLI calls will fail.
+ * for local sessions. The deploy key must belong to the same deployment as
+ * convexDeployment / CONVEX_DEPLOYMENT or CLI calls will fail.
  */
 function convexProcessEnv(): NodeJS.ProcessEnv {
   const deployment = resolveDeploymentLabel();
+  const deployKey = resolveConvexDeployKey();
   return {
     ...process.env,
     CONVEX_DEPLOYMENT: deployment,
+    ...(deployKey ? { CONVEX_DEPLOY_KEY: deployKey } : {}),
   };
 }
 

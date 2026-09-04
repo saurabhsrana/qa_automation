@@ -13,7 +13,7 @@ const uatConfig: EnvironmentConfig = {
   ocePractice: process.env.OCE_PRACTICE?.trim() || "Dauwe Plastic Surgery",
   oceLocation: process.env.OCE_LOCATION?.trim() || "Dallas-TX-10707",
   // UAT Convex deployment slug — set when provisioned, or override via CONVEX_DEPLOYMENT in .env.
-  convexDeployment: "",
+  convexDeployment: "industrious-trout-712",
 };
 
 export default uatConfig;
