@@ -41,16 +41,16 @@ npx playwright test --project=chromium          # full suite
 
 ### Tagging new tests
 
-Add Playwright tags on `test.describe` / `test()` **and** keep Allure tags for reporting:
+Put Playwright tags on `test.describe` **or** `test()`, not both (Allure copies each `@smoke` / `@regression`). Use `applyAllureBehavior` for epic/feature/story plus suite names only (`welcome`, `completeprofile`) — do not repeat `smoke` / `regression` there.
 
 ```typescript
 test.describe("My flow", { tag: ["@smoke", "@regression"] }, () => {
-  test("clear descriptive title", { tag: ["@smoke"] }, async ({ ... }) => {
+  test("clear descriptive title", async ({ ... }) => {
     await applyAllureBehavior({
       epic: "Loyalty",
       feature: "My flow",
       story: "clear descriptive title",
-      tags: ["smoke"],
+      tags: ["myflow"],
     });
   });
 });

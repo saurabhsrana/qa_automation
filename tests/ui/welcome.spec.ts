@@ -15,26 +15,24 @@ test.describe(
         epic: "Loyalty",
         feature: "Revance Welcome Page",
         story: "User visits the welcome page and verifies UI elements",
-        tags: ["welcome", "smoke", "regression"],
+        tags: ["welcome"],
       });
     });
 
-    test(
-      "User visits the welcome page and verifies UI elements",
-      { tag: ["@smoke", "@regression"] },
-      async ({ welcomePage }) => {
-        await test.step("I am on the Revance Welcome page", async () => {
-          await welcomePage.goto();
-        });
+    test("User visits the welcome page and verifies UI elements", async ({
+      welcomePage,
+    }) => {
+      await test.step("I am on the Revance Welcome page", async () => {
+        await welcomePage.goto();
+      });
 
-        await test.step(`the main heading should be "${welcomeHeading}"`, async () => {
-          await welcomePage.expectHeading(welcomeHeading);
-        });
+      await test.step(`the main heading should be "${welcomeHeading}"`, async () => {
+        await welcomePage.expectHeading(welcomeHeading);
+      });
 
-        await test.step("the Contact Us link should be visible", async () => {
-          await welcomePage.expectContactUsVisible();
-        });
-      },
-    );
+      await test.step("the Contact Us link should be visible", async () => {
+        await welcomePage.expectContactUsVisible();
+      });
+    });
   },
 );

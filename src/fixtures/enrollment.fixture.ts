@@ -22,7 +22,7 @@ export const test = loyaltyTest.extend<EnrollmentFixtures>({
         epic: "Loyalty",
         feature: "Revance complete profile",
         story: testInfo.title,
-        tags: ["completeprofile", "smoke", "regression"],
+        tags: ["completeprofile"],
       });
       const session = await enableEnrollmentAutomationForRun();
       try {
