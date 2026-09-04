@@ -89,13 +89,13 @@ E2E hits a **shared QA environment**, so PR runs are gated behind the **`ready-f
 
 ### Configuration
 
-Environment config lives in `src/config/environments/{dev,qa,uat}.config.ts`. Selection is via `getEnvironmentConfig()` (`TEST_ENV`: **dev | qa | uat**; default **qa** when unset). CI sets `TEST_ENV=qa` — no GitHub secrets required for the default QA run.
+Environment config lives in `src/config/environments/{dev,qa,uat}.config.ts`. Selection is via `getEnvironmentConfig()` (`TEST_ENV`: **dev | qa | uat**; default **qa** when unset). CI sets `TEST_ENV=qa` and uses repository secrets `CONVEX_DEPLOY_KEY_QA` / `CONVEX_DEPLOY_KEY_UAT` for enrollment flag automation.
 
 At the start of each run, the console prints `Running against: QA (https://…)`. If `BASE_URL` in `.env` overrides the env default, a warning is logged.
 
-Optional `.env` overrides: `TEST_ENV`, `BASE_URL`, `QA_TEST_OTP`, `CONVEX_DEPLOY_KEY`, `CONVEX_DEPLOYMENT` (see `.env.example`).
+Optional `.env` overrides: `TEST_ENV`, `BASE_URL`, `QA_TEST_OTP`, `CONVEX_DEPLOY_KEY_QA`, `CONVEX_DEPLOY_KEY_UAT`, `CONVEX_DEPLOYMENT` (see `.env.example`).
 
-**Enrollment tests (`completeprofile.spec.ts`)** temporarily set Convex `FEATURE_AUTOMATION_ENABLED=true` via `npx convex env set` before the spec and restore the original value after (pass or fail). Requires `convexDeployment` in the active env config (or `CONVEX_DEPLOYMENT` override) and local `npx convex login` or CI `CONVEX_DEPLOY_KEY` secret.
+**Enrollment tests (`completeprofile.spec.ts`)** temporarily set Convex `FEATURE_AUTOMATION_ENABLED=true` via `npx convex env set` before the spec and restore the original value after (pass or fail). Requires `convexDeployment` in the active env config (or `CONVEX_DEPLOYMENT` override) and local `npx convex login` or a deploy key: `CONVEX_DEPLOY_KEY_QA` when `TEST_ENV=qa`, `CONVEX_DEPLOY_KEY_UAT` when `TEST_ENV=uat`.
 
 **Browser matrix:** Default runs use **chromium + firefox** only. WebKit is excluded (Vercel bot checkpoint). Raw `playwright test` without `--project` also skips WebKit. To run WebKit explicitly: `npm run test:webkit`.
 

@@ -120,9 +120,10 @@ jobs:
           BROWSER: ${{ matrix.browser }}
           PARALLEL_WORKERS: '1'
           # Enrollment tests (completeprofile) toggle FEATURE_AUTOMATION_ENABLED via Convex CLI.
-          # Add repository secret CONVEX_DEPLOY_KEY — deploy key for the QA Convex deployment
-          # (must match convexDeployment in src/config/environments/qa.config.ts or CONVEX_DEPLOYMENT).
-          CONVEX_DEPLOY_KEY: ${{ secrets.CONVEX_DEPLOY_KEY }}
+          # convexFeatureFlag.ts maps TEST_ENV → CONVEX_DEPLOY_KEY_QA / CONVEX_DEPLOY_KEY_UAT
+          # (must match convexDeployment in the active env config).
+          CONVEX_DEPLOY_KEY_QA: ${{ secrets.CONVEX_DEPLOY_KEY_QA }}
+          CONVEX_DEPLOY_KEY_UAT: ${{ secrets.CONVEX_DEPLOY_KEY_UAT }}
           # push/PR: inputs.enable_video is unset → off. Manual run: enable_video checkbox.
           PW_VIDEO: ${{ inputs.enable_video == true && 'on' || 'off' }}
         run: |
