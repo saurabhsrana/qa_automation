@@ -1,5 +1,5 @@
-import * as allure from "allure-js-commons";
 import { test } from "../../src/fixtures/loyalty.fixture";
+import { applyAllureBehavior } from "../../src/utils/allureMeta";
 import { welcomeHeading } from "../../src/utils/testData";
 
 /**
@@ -7,14 +7,18 @@ import { welcomeHeading } from "../../src/utils/testData";
  * Restores formerly commented heading + Contact Us assertions.
  */
 test.describe("Revance Welcome Page", () => {
+  test.beforeEach(async () => {
+    await applyAllureBehavior({
+      epic: "Loyalty",
+      feature: "Revance Welcome Page",
+      story: "User visits the welcome page and verifies UI elements",
+      tags: ["welcome", "smoke", "regression"],
+    });
+  });
+
   test("User visits the welcome page and verifies UI elements", async ({
     welcomePage,
   }) => {
-    await allure.epic("Loyalty");
-    await allure.feature("Revance Welcome Page");
-    await allure.story("User visits the welcome page and verifies UI elements");
-    await allure.tags("welcome", "smoke", "regression");
-
     await test.step("I am on the Revance Welcome page", async () => {
       await welcomePage.goto();
     });

@@ -15,6 +15,17 @@ const CONVEX_CLI = path.join(
 const UNKNOWN_EXIT = "unknown";
 const UNKNOWN_ERROR = "unknown error";
 
+const DEPLOY_KEY_ENV_VAR = {
+  qa: "CONVEX_DEPLOY_KEY_QA",
+  uat: "CONVEX_DEPLOY_KEY_UAT",
+  dev: "CONVEX_DEPLOY_KEY_DEV",
+} as const;
+
+/** Convex deploy keys look like `prod:name|…`, `dev:name|…`, `preview:…|…`, or `project:…|…`. */
+function looksLikeConvexDeployKey(value: string): boolean {
+  return /^(dev|prod|preview|project):.+\|/.test(value);
+}
+
 function resolveDeploymentLabel(): string {
   const config = getEnvironmentConfig();
   const fromEnv = process.env.CONVEX_DEPLOYMENT?.trim();
@@ -38,16 +49,18 @@ function resolveDeploymentLabel(): string {
  *   uat → CONVEX_DEPLOY_KEY_UAT
  * Generic CONVEX_DEPLOY_KEY is a fallback (local / older CI).
  */
-function resolveConvexDeployKey(): string | undefined {
+function resolveConvexDeployKey(): { key?: string; source: string } {
   const env = getEnvironmentConfig().env;
-  const envSpecificKey = {
-    qa: process.env.CONVEX_DEPLOY_KEY_QA,
-    uat: process.env.CONVEX_DEPLOY_KEY_UAT,
-    dev: process.env.CONVEX_DEPLOY_KEY_DEV,
-  }[env];
-  const resolved =
-    envSpecificKey?.trim() || process.env.CONVEX_DEPLOY_KEY?.trim() || "";
-  return resolved || undefined;
+  const envVar = DEPLOY_KEY_ENV_VAR[env];
+  const envSpecificKey = process.env[envVar]?.trim();
+  if (envSpecificKey) {
+    return { key: envSpecificKey, source: envVar };
+  }
+  const fallback = process.env.CONVEX_DEPLOY_KEY?.trim();
+  if (fallback) {
+    return { key: fallback, source: "CONVEX_DEPLOY_KEY" };
+  }
+  return { source: envVar };
 }
 
 /**
@@ -59,13 +72,11 @@ function resolveConvexDeployKey(): string | undefined {
  *   CONVEX_DEPLOY_KEY for the CLI (no separate flag).
  *   https://docs.convex.dev/cli/deploy-key-types
  *
- * Target deployment: `--deployment <name>` on each command, plus CONVEX_DEPLOYMENT
- * for local sessions. The deploy key must belong to the same deployment as
- * convexDeployment / CONVEX_DEPLOYMENT or CLI calls will fail.
+ * Target: a deploy key already names the deployment (do not pass --deployment).
+ * Local login: pass --deployment <slug> so the session can resolve the target.
  */
-function convexProcessEnv(): NodeJS.ProcessEnv {
+function convexProcessEnv(deployKey?: string): NodeJS.ProcessEnv {
   const deployment = resolveDeploymentLabel();
-  const deployKey = resolveConvexDeployKey();
   return {
     ...process.env,
     CONVEX_DEPLOYMENT: deployment,
@@ -82,16 +93,41 @@ function formatCliFailure(
   return `[convex] ${operation} failed on ${deployment} (exit ${status ?? UNKNOWN_EXIT}): ${detail || UNKNOWN_ERROR}`;
 }
 
+function assertDeployKeyUsable(key: string, source: string): void {
+  if (!looksLikeConvexDeployKey(key)) {
+    throw new Error(
+      `[convex] ${source} is set but is not a Convex deploy key. ` +
+        `Expected a value like prod:<deployment>|… or dev:<deployment>|… ` +
+        `(Convex dashboard → Project Settings → Deploy Keys). ` +
+        `Do not store the deployment slug (${resolveDeploymentLabel()}) as the secret.`,
+    );
+  }
+}
+
 function runConvexCli(
   args: string[],
   operation: string,
 ): { stdout: string; stderr: string; status: number | null } {
   const deployment = resolveDeploymentLabel();
-  const cliArgs = [...args, "--deployment", deployment];
+  const { key: deployKey, source } = resolveConvexDeployKey();
+
+  // CONVEX_DEPLOY_KEY already selects the deployment. Passing --deployment
+  // with a key is rejected by the CLI; passing --deployment without a key
+  // requires `npx convex login` (no login session on CI → 401 MissingAccessToken).
+  if (deployKey) {
+    assertDeployKeyUsable(deployKey, source);
+  } else if (process.env.CI === "true") {
+    throw new Error(
+      `[convex] ${source} is not set in CI. Add the GitHub Actions secret ` +
+        `${source} (deploy key for ${deployment}) so enrollment tests can call \`convex env\`.`,
+    );
+  }
+
+  const cliArgs = deployKey ? [...args] : [...args, "--deployment", deployment];
 
   const result = spawnSync(process.execPath, [CONVEX_CLI, ...cliArgs], {
     cwd: process.cwd(),
-    env: convexProcessEnv(),
+    env: convexProcessEnv(deployKey),
     encoding: "utf8",
   });
 

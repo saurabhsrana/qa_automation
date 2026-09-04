@@ -1,5 +1,6 @@
-import { test as loyaltyTest } from "./loyalty.fixture";
+import { applyAllureBehavior } from "../utils/allureMeta";
 import { enableEnrollmentAutomationForRun } from "../utils/convexFeatureFlag";
+import { test as loyaltyTest } from "./loyalty.fixture";
 
 type EnrollmentFixtures = {
   /** Auto: enables FEATURE_AUTOMATION_ENABLED before enrollment tests; restores after. */
@@ -14,7 +15,15 @@ type EnrollmentFixtures = {
 export const test = loyaltyTest.extend<EnrollmentFixtures>({
   _enrollmentAutomationFlag: [
     // eslint-disable-next-line no-empty-pattern -- Convex toggle has no upstream fixture deps
-    async ({}, use) => {
+    async ({}, use, testInfo) => {
+      // Labels must be set here: a Convex failure aborts before the spec body,
+      // which would otherwise leave the result ungrouped in Allure Behaviors.
+      await applyAllureBehavior({
+        epic: "Loyalty",
+        feature: "Revance complete profile",
+        story: testInfo.title,
+        tags: ["completeprofile", "smoke", "regression"],
+      });
       const session = await enableEnrollmentAutomationForRun();
       try {
         await use(undefined);

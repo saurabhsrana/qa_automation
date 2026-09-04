@@ -1,5 +1,5 @@
-import * as allure from "allure-js-commons";
 import { test } from "../../src/fixtures/enrollment.fixture";
+import { applyAllureBehavior } from "../../src/utils/allureMeta";
 import {
   profileDataSets,
   resolveUniquePhone,
@@ -12,19 +12,22 @@ import {
  * Examples row kept as a one-item array for future data-driven extension.
  */
 test.describe("Revance complete profile", () => {
+  test.beforeEach(async () => {
+    await applyAllureBehavior({
+      epic: "Loyalty",
+      feature: "Revance complete profile",
+      story:
+        "User completes sign-up, profile questions, and sees the rewards dashboard",
+      tags: ["completeprofile", "smoke", "regression"],
+    });
+  });
+
   for (const data of profileDataSets) {
     test("User completes sign-up, profile questions, and sees the rewards dashboard", async ({
       welcomePage,
       signupPage,
       loyaltyState,
     }) => {
-      await allure.epic("Loyalty");
-      await allure.feature("Revance complete profile");
-      await allure.story(
-        "User completes sign-up, profile questions, and sees the rewards dashboard",
-      );
-      await allure.tags("completeprofile", "smoke", "regression");
-
       await test.step("I am on the Revance Welcome page", async () => {
         await welcomePage.goto();
       });
