@@ -37,8 +37,7 @@ Path: `manual-test-cases/{STORY-KEY}.md`
 
 Each case must have:
 
-- ID (`TC-001`, …)
-- Title
+- Title (clear, descriptive — no `TC-001`-style ids)
 - Type (one of the six coverage types)
 - Priority (P0–P3)
 - Preconditions
@@ -88,14 +87,14 @@ import { test, expect } from '@playwright/test';
 // import { test, expect } from '../src/fixtures';
 
 test.describe('{STORY-KEY}: {short title}', () => {
-  test('TC-001: {title}', async ({ page }) => {
+  test('{clear descriptive title}', async ({ page }) => {
     // steps using page objects — no waitForTimeout
   });
 });
 ```
 
 - One describe per story
-- Test titles include TC ids from the manual file
+- Test titles must be clear and descriptive (mirror manual case titles); use `test.step()` for each action/assertion
 - Use `expect` soft only when documenting multiple independent checks is intentional
 - Import page objects from `src/page-objects/`
 - New locators go on page objects, not inline in the spec (except trivial one-offs)

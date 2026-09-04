@@ -1,14 +1,26 @@
 # Loyalty Playwright automation (welcome + complete profile)
 
-Playwright Test for Revance Loyalty. Reporting is **Allure only**. Test cases are tracked in Allure via `allure.tms` / `TC-*` tags.
+Playwright Test for Revance Loyalty. Reporting is **Allure only**. Tests are identified by clear, descriptive `test()` titles and `test.step()` names.
 
 ## Suites
 
-| Spec | Tags / TMS | Command |
-|------|------------|---------|
-| Welcome / phone OTP | `TC-1` | `npm run test:welcome` |
-| Complete profile | `TC-2` | `npm run test:completeprofile` |
+| Spec | Tags | Command (default = qa) |
+|------|------|-------------------------|
+| Welcome / phone OTP | `welcome`, `smoke`, `regression` | `npm run test:welcome` or `npm run test:welcome:uat` |
+| Complete profile | `completeprofile`, `smoke`, `regression` | `npm run test:completeprofile` or `npm run test:completeprofile:uat` |
 | Both (UI project) | | `npm run test:loyalty` or `npm test` |
+
+Explicit env variants exist for every family: `:qa`, `:uat`, `:dev` (e.g. `npm run test:pw:uat`).
+
+**Environment selection:** Base scripts use `scripts/run-playwright.js` — they default to **qa** when `TEST_ENV` is unset and **preserve** a `TEST_ENV` you set in the shell. Use `:qa` / `:uat` / `:dev` script suffixes when you want the env fixed regardless of shell state.
+
+```powershell
+# Shell TEST_ENV is respected (not overwritten by npm script):
+$env:TEST_ENV="uat"; npm run test:welcome
+
+# Explicit variant (always uat):
+npm run test:welcome:uat
+```
 
 API enrollment specs are reserved under `tests/api/` (see `docs/api-enrollment-endpoints-reference.md`).
 
@@ -20,20 +32,20 @@ npm ci
 npx playwright install
 ```
 
-## Allure test case tracking
+## Allure reporting
 
 ```bash
 npm test
 npm run allure:report
-npm run traceability:generate
 npm run ci:summary
 ```
 
 PowerShell tip: prefer single `npm run …` scripts (no `&&`). Example: `npm run allure:report` runs generate then open.
 
-- Tag each test with `allure.tags(..., "TC-<n>")` and `allure.tms("<n>", ...)`
+- Name each test with a clear, descriptive `test('…')` title; use `test.step('…')` for actions and assertions
+- Optional functional tags via `allure.tags(...)` (e.g. `smoke`, `regression`) — no test-case ID tags
 - On failure, Allure includes screenshot + downloadable Playwright trace zip
-- No GitHub Issue links are generated from test case IDs; Allure is the source of truth for TC pass/fail status
+- Allure **Behaviors** and **Suites** views organize results by epic/feature/story and describe/test titles
 
 ## Layout
 
@@ -41,12 +53,12 @@ PowerShell tip: prefer single `npm run …` scripts (no `&&`). Example: `npm run
 tests/ui/      welcome.spec.ts, completeprofile.spec.ts
 tests/api/     reserved (README only until contract-verified rewrite)
 src/page-objects/  WelcomePage, SignupPage, BasePage, PhoneOtpFormComponent
-src/fixtures/  loyalty.fixture.ts (welcomePage, signupPage, loyaltyState)
-src/config/    env.*, oceAuth, browser.factory
+src/fixtures/  loyalty.fixture.ts, enrollment.fixture.ts (Convex flag for enrollment)
+src/config/    environmentResolver, environments/{dev,qa,uat}.config.ts, oceAuth, browser.factory
 src/data/      constants.json (static test data)
 src/utils/     testData.ts (dynamic helpers), logger.ts
 docs/          FRAMEWORK.md, api-enrollment-endpoints-reference.md
-scripts/       ci-job-summary.js, generate-traceability.js, allure-clean.js
+scripts/       ci-job-summary.js, allure-clean.js
 playwright.config.ts
 allurerc.cjs
 ```
@@ -77,9 +89,13 @@ E2E hits a **shared QA environment**, so PR runs are gated behind the **`ready-f
 
 ### Configuration
 
-QA **baseUrl** and **otp** live in `src/config/env.qa.ts`. CI sets `TEST_ENV=qa` — no GitHub secrets required for the default QA run.
+Environment config lives in `src/config/environments/{dev,qa,uat}.config.ts`. Selection is via `getEnvironmentConfig()` (`TEST_ENV`: **dev | qa | uat**; default **qa** when unset). CI sets `TEST_ENV=qa` — no GitHub secrets required for the default QA run.
 
-Optional `.env` override: `BASE_URL`, `QA_TEST_OTP` (see `.env.example`).
+At the start of each run, the console prints `Running against: QA (https://…)`. If `BASE_URL` in `.env` overrides the env default, a warning is logged.
+
+Optional `.env` overrides: `TEST_ENV`, `BASE_URL`, `QA_TEST_OTP`, `CONVEX_DEPLOY_KEY`, `CONVEX_DEPLOYMENT` (see `.env.example`).
+
+**Enrollment tests (`completeprofile.spec.ts`)** temporarily set Convex `FEATURE_AUTOMATION_ENABLED=true` via `npx convex env set` before the spec and restore the original value after (pass or fail). Requires `convexDeployment` in the active env config (or `CONVEX_DEPLOYMENT` override) and local `npx convex login` or CI `CONVEX_DEPLOY_KEY` secret.
 
 **Browser matrix:** Default runs use **chromium + firefox** only. WebKit is excluded (Vercel bot checkpoint). Raw `playwright test` without `--project` also skips WebKit. To run WebKit explicitly: `npm run test:webkit`.
 

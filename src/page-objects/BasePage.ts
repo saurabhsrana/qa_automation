@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { type Locator, type Page, expect } from "@playwright/test";
-import config from "../config";
+import { getEnvironmentConfig } from "../config/environmentResolver";
 
 /**
  * Shared Page Object base — navigation, waits, and safe interactions.
@@ -58,9 +58,9 @@ export abstract class BasePage {
     await expect(locator).toBeVisible({ timeout });
   }
 
-  /** Resolve Loyalty base URL from src/config (TEST_ENV + optional BASE_URL override). */
+  /** Resolve Loyalty base URL from getEnvironmentConfig() (TEST_ENV + optional BASE_URL override). */
   protected loyaltyBaseUrl(): string {
-    return config.baseUrl.replace(/\/$/, "");
+    return getEnvironmentConfig().baseUrl;
   }
 }
 

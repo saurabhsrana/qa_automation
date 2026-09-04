@@ -1,4 +1,4 @@
-import config from "./index";
+import { getEnvironmentConfig } from "./environmentResolver";
 
 export type OceAuthConfig = {
   baseUrl: string;
@@ -8,22 +8,13 @@ export type OceAuthConfig = {
   location: string;
 };
 
-type OceConfigShape = {
-  oceBaseUrl?: string;
-  oceBaseUrlnew?: string;
-  oceUsername?: string;
-  ocePassword?: string;
-  ocePractice?: string;
-  oceLocation?: string;
-};
-
 /**
  * Resolves OCE login + practice/location from:
  * 1) process.env overrides (OCE_*)
- * 2) environment-specific config (src/config/env.{TEST_ENV}.ts)
+ * 2) environment-specific config via getEnvironmentConfig()
  */
 export function resolveOceAuthConfig(): OceAuthConfig {
-  const c = config as OceConfigShape;
+  const c = getEnvironmentConfig();
 
   const clean = (value: string | undefined): string => {
     const v = value?.trim() ?? "";
@@ -34,21 +25,21 @@ export function resolveOceAuthConfig(): OceAuthConfig {
 
   const baseUrl =
     clean(process.env.OCE_BASE_URL) ||
-    c.oceBaseUrlnew?.trim() ||
-    c.oceBaseUrl?.trim() ||
+    c.oceBaseUrlnew.trim() ||
+    c.oceBaseUrl.trim() ||
     "";
 
   const username =
-    clean(process.env.OCE_USERNAME) || c.oceUsername?.trim() || "";
+    clean(process.env.OCE_USERNAME) || c.oceUsername.trim() || "";
   const password =
-    clean(process.env.OCE_PASSWORD) || c.ocePassword?.trim() || "";
+    clean(process.env.OCE_PASSWORD) || c.ocePassword.trim() || "";
   const practice =
     clean(process.env.OCE_PRACTICE) ||
-    c.ocePractice?.trim() ||
+    c.ocePractice.trim() ||
     "Pleasanton Dermatology";
   const location =
     clean(process.env.OCE_LOCATION) ||
-    c.oceLocation?.trim() ||
+    c.oceLocation.trim() ||
     "Pleasanton - CA";
 
   const missing: string[] = [];
@@ -57,7 +48,7 @@ export function resolveOceAuthConfig(): OceAuthConfig {
   if (!password) missing.push("ocePassword / OCE_PASSWORD");
   if (missing.length) {
     throw new Error(
-      `Missing OCE auth config for TEST_ENV=${process.env.TEST_ENV || "dev"}: ${missing.join(", ")}`,
+      `Missing OCE auth config for TEST_ENV=${getEnvironmentConfig().env}: ${missing.join(", ")}`,
     );
   }
 

@@ -11,7 +11,7 @@
 # an already-labeled PR re-run E2E automatically. Removing the label skips E2E
 # on the next unlabeled/synchronize evaluation.
 #
-# QA targets from src/config/env.qa.ts (TEST_ENV=qa) — baseUrl and otp; no GitHub secrets required.
+# QA targets from src/config/environments/qa.config.ts (TEST_ENV=qa) — baseUrl and otp; no GitHub secrets required.
 #
 # One-time GitHub Pages setup (for browsable Allure report):
 #   Settings → Pages → Build and deployment → Source: GitHub Actions
@@ -107,7 +107,7 @@ jobs:
             echo "## QA config"
             echo ""
             echo "- Browser matrix: \`${{ matrix.browser }}\`"
-            echo "- TEST_ENV: \`qa\` → \`src/config/env.qa.ts\` (baseUrl, otp)"
+            echo "- TEST_ENV: \`qa\` → \`src/config/environments/qa.config.ts\` (baseUrl, otp)"
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Playwright UI (--project=${{ matrix.browser }})
@@ -119,6 +119,10 @@ jobs:
           TEST_ENV: qa
           BROWSER: ${{ matrix.browser }}
           PARALLEL_WORKERS: '1'
+          # Enrollment tests (completeprofile) toggle FEATURE_AUTOMATION_ENABLED via Convex CLI.
+          # Add repository secret CONVEX_DEPLOY_KEY — deploy key for the QA Convex deployment
+          # (must match convexDeployment in src/config/environments/qa.config.ts or CONVEX_DEPLOYMENT).
+          CONVEX_DEPLOY_KEY: ${{ secrets.CONVEX_DEPLOY_KEY }}
           # push/PR: inputs.enable_video is unset → off. Manual run: enable_video checkbox.
           PW_VIDEO: ${{ inputs.enable_video == true && 'on' || 'off' }}
         run: |
@@ -164,12 +168,7 @@ jobs:
         run: npm run allure:generate
         continue-on-error: true
 
-      - name: Generate traceability matrix
-        if: always()
-        run: npm run traceability:generate
-        continue-on-error: true
-
-      - name: GitHub Job Summary (TC linkage + failures)
+      - name: GitHub Job Summary
         if: always()
         env:
           BROWSER: ${{ matrix.browser }}
@@ -194,7 +193,6 @@ jobs:
             reports/traces/
             reports/screenshots/
             reports/logs/
-            docs/traceability-matrix.md
             test-results/
             playwright-ci.log
           retention-days: 14

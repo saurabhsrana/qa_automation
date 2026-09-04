@@ -31,29 +31,6 @@ function statusEmoji(status) {
   return status || "unknown";
 }
 
-function extractTcFromLabels(labels) {
-  const ids = [];
-  for (const label of labels || []) {
-    if (label?.name === "tag" && /^TC-(\d+)$/i.test(String(label.value || ""))) {
-      ids.push(RegExp.$1);
-    }
-    if (label?.name === "tms" && /(\d+)/.test(String(label.value || ""))) {
-      ids.push(RegExp.$1);
-    }
-  }
-  return [...new Set(ids)];
-}
-
-function extractTcIds(tags) {
-  const ids = [];
-  for (const tag of tags || []) {
-    const name = typeof tag === "string" ? tag : tag.name;
-    const m = String(name || "").match(/@TC-(\d+)/i);
-    if (m) ids.push(m[1]);
-  }
-  return ids;
-}
-
 function listPngFiles(dir, limit = 5) {
   if (!fs.existsSync(dir)) return [];
   return fs
@@ -132,7 +109,7 @@ function appendCommonTail(lines) {
 
   lines.push(...artifactLinks());
   lines.push(
-    "Test cases are tracked in Allure via `TC-*` tags / `allure.tms(...)`; no external GitHub Issue links are generated.",
+    "Tests are identified by descriptive titles and step names in the Allure report (Behaviors / Suites views).",
   );
 }
 
@@ -142,7 +119,7 @@ function buildFromAllure(results) {
   if (browser) {
     lines.push(`**Browser:** \`${browser}\``, "");
   }
-  lines.push("| Status | Test | Test case |", "| --- | --- | --- |");
+  lines.push("| Status | Test |", "| --- | --- |");
 
   let passed = 0;
   let failed = 0;
@@ -155,14 +132,8 @@ function buildFromAllure(results) {
     else if (status === "failed" || status === "broken") failed += 1;
     else other += 1;
 
-    const tcIds = extractTcFromLabels(r.labels);
-    const tcLinks =
-      tcIds.length > 0
-        ? tcIds.map((id) => `TC-${id}`).join(", ")
-        : "_none_";
-
     lines.push(
-      `| ${statusEmoji(status)} | ${r.name || r.fullName || "unnamed"} | ${tcLinks} |`,
+      `| ${statusEmoji(status)} | ${r.name || r.fullName || "unnamed"} |`,
     );
 
     if (status === "failed" || status === "broken") {
@@ -223,7 +194,7 @@ function buildFromCucumber(features) {
   if (browser) {
     lines.push(`**Browser:** \`${browser}\``, "");
   }
-  lines.push("| Status | Scenario | Test case |", "| --- | --- | --- |");
+  lines.push("| Status | Scenario |", "| --- | --- |");
 
   let passed = 0;
   let failed = 0;
@@ -239,14 +210,8 @@ function buildFromCucumber(features) {
       else if (status === "failed") failed += 1;
       else other += 1;
 
-      const tcIds = extractTcIds(el.tags);
-      const tcLinks =
-        tcIds.length > 0
-          ? tcIds.map((id) => `TC-${id}`).join(", ")
-          : "_none_";
-
       lines.push(
-        `| ${statusEmoji(status)} | ${el.name || feature.name || "unnamed"} | ${tcLinks} |`,
+        `| ${statusEmoji(status)} | ${el.name || feature.name || "unnamed"} |`,
       );
 
       if (status === "failed") {
