@@ -5,6 +5,7 @@
 #   - Push to develop → smoke only (@smoke)
 #   - Pull request → Lint & typecheck always; E2E smoke only with ready-for-e2e label
 #   - Manual run: GitHub → Actions → CI → Run workflow (optional test_filter --grep)
+#     Pages deploys on main/master for push and workflow_dispatch; last 5 reports kept under /runs/
 #
 # E2E tests hit a shared QA environment, so on PRs they are gated behind the
 # ready-for-e2e label to avoid multiple PRs colliding on shared test data.
@@ -20,7 +21,7 @@
 # After a run:
 #   - Playwright UI (chromium|firefox) jobs → Summary + per-browser artifacts
 #   - publish-allure → merges Allure results from all browsers, then GitHub Pages URL
-#     (Pages deploy is main/master push only — develop never publishes the live report)
+#     (Pages deploy is main/master only — push or manual Run workflow; develop never publishes)
 #   - Manual "Run workflow" can set enable_video=true (sets PW_VIDEO=on) when motion matters
 #
 # Artifact retention: keep upload-artifact retention-days in sync (default 14 below).
@@ -340,7 +341,7 @@ jobs:
         env:
           EVENT_NAME: ${{ github.event_name }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-          IS_MAIN_PUSH: ${{ github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master') }}
+          IS_PAGES_DEPLOY: ${{ (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master') }}
         run: |
           {
             echo "## Allure report"
@@ -349,14 +350,16 @@ jobs:
             echo ""
             echo "Download: [Run artifacts]($RUN_URL#artifacts)"
             echo ""
-            if [ "$IS_MAIN_PUSH" = "true" ]; then
-              echo "GitHub Pages deploy runs next (main push only)."
+            if [ "$IS_PAGES_DEPLOY" = "true" ]; then
+              echo "GitHub Pages deploy runs next (main/master push or manual Run workflow)."
               echo ""
-              echo "Expected live URL (after one-time Pages setup): \`https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/\`"
+              echo "Latest: \`https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/\`"
+              echo ""
+              echo "Last 5: \`https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/archive.html\`"
               echo ""
               echo "If Pages is not enabled yet: **Settings → Pages → Source: GitHub Actions**, then re-run CI."
             else
-              echo "Pages deploy skipped on PR runs — see the **allure-report-combined** build artifact above."
+              echo "Pages deploy skipped (not a main/master push or manual run) — see the **allure-report-combined** build artifact above."
               echo ""
               echo "After download: unzip and open \`index.html\` in a browser."
               echo ""
@@ -415,10 +418,10 @@ jobs:
     needs: [combine-allure, publish-allure]
     # always() is required: without it, GitHub skips this job when any upstream
     # dependency chain includes a failed Playwright matrix job — even if combine/publish succeeded.
-    # Still main/master push only (never PR merge refs / environment protection).
+    # main/master only: push or manual Run workflow (never PR / develop).
     if: >-
       always()
-      && github.event_name == 'push'
+      && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
       && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
       && needs.combine-allure.result == 'success'
     runs-on: ubuntu-latest
@@ -431,17 +434,35 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
+      - uses: actions/checkout@v4
+
       - name: Download combined Allure report
         uses: actions/download-artifact@v4
         with:
           name: allure-report-combined
           path: artifact
 
-      - name: Prepare Allure site for GitHub Pages
-        run: |
-          # Prevent Jekyll from stripping Allure assets (underscore paths, etc.).
-          touch artifact/.nojekyll
-          test -f artifact/index.html
+      - name: Restore previous Allure Pages site
+        uses: actions/cache/restore@v4
+        with:
+          path: site
+          key: allure-pages-site-${{ github.ref_name }}-${{ github.run_id }}
+          restore-keys: |
+            allure-pages-site-${{ github.ref_name }}-
+
+      - name: Assemble last-5 Allure site
+        id: site
+        env:
+          ALLURE_PAGES_SITE: site
+          ALLURE_REPORT_DIR: artifact
+          ALLURE_PAGES_KEEP: '5'
+        run: node scripts/prepare-allure-pages-site.js
+
+      - name: Save Allure Pages site cache
+        uses: actions/cache/save@v4
+        with:
+          path: site
+          key: allure-pages-site-${{ github.ref_name }}-${{ github.run_id }}
 
       - name: Setup Pages
         id: pages
@@ -453,7 +474,7 @@ jobs:
         if: steps.pages.outcome == 'success'
         uses: actions/upload-pages-artifact@v3
         with:
-          path: artifact
+          path: site
 
       - name: Deploy to GitHub Pages
         id: deployment
@@ -466,6 +487,7 @@ jobs:
           PAGES_OUTCOME: ${{ steps.pages.outcome }}
           DEPLOY_OUTCOME: ${{ steps.deployment.outcome }}
           PAGE_URL: ${{ steps.deployment.outputs.page_url }}
+          KEPT_RUNS: ${{ steps.site.outputs.kept }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           EXPECTED_PAGE_URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/
         run: |
@@ -473,9 +495,13 @@ jobs:
             echo "## Allure report publish"
             echo ""
             if [ "$DEPLOY_OUTCOME" = "success" ] && [ -n "$PAGE_URL" ]; then
-              echo "Combined Chromium + Firefox Allure report:"
+              echo "Latest Allure (this run): [Open report]($PAGE_URL)"
               echo ""
-              echo "[Open Allure report]($PAGE_URL)"
+              echo "Last 5 reports: [archive.html](${PAGE_URL}archive.html)"
+              echo ""
+              echo "This run folder: \`${PAGE_URL}runs/${{ github.run_number }}/\`"
+              echo ""
+              echo "Kept run numbers: \`${KEPT_RUNS:-${{ github.run_number }}}\`"
               echo ""
               echo "Raw URL: \`$PAGE_URL\`"
             elif [ "$PAGES_OUTCOME" != "success" ]; then

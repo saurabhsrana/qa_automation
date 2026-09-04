@@ -18,7 +18,7 @@ feature/<short-name>
 
 Do **not** open a PR from `feature/*` into `main`. CI job **`PR source must be develop`** fails those PRs. Add that check as a required status on `main` in GitHub → Settings → Branches.
 
-Push to `develop` runs **smoke**. Push to `main` runs the **full suite** and publishes Allure to GitHub Pages.
+Push to `develop` runs **smoke**. Push to `main` (or **Run workflow** on `main`) runs the **full suite** and publishes Allure to GitHub Pages (latest at `/`, last 5 at `/archive.html`).
 
 ## CI workflow (smoke vs regression)
 

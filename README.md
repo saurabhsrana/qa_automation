@@ -77,7 +77,7 @@ Branching: `feature/*` → `develop` → `main`. PRs into `main` must come from 
 | Push to `develop` | Yes | Yes — **`@smoke` only** | No |
 | Pull request (no label) | Yes | **Skipped** (neutral) | No |
 | Pull request + `ready-for-e2e` label | Yes | Yes — **`@smoke` only** | No (artifact + PR comment only) |
-| Manual **Run workflow** | Yes | Yes — `test_filter` (`@smoke` / `@regression` / empty = all) | Only if run on main |
+| Manual **Run workflow** | Yes | Yes — `test_filter` (`@smoke` / `@regression` / empty = all) | Yes if the run is on `main` / `master` |
 
 E2E hits a **shared QA environment**, so PR runs are gated behind the **`ready-for-e2e`** label to avoid colliding on shared test data.
 
@@ -88,7 +88,7 @@ E2E hits a **shared QA environment**, so PR runs are gated behind the **`ready-f
 1. **Lint & typecheck** — ESLint, TypeScript, Prettier
 2. **Playwright UI** — chromium / firefox matrix (WebKit excluded — Vercel bot checkpoint; run locally via `npm run test:webkit`)
 3. **Reports** — Combine Allure, Job Summary, artifacts (14-day retention)
-4. **Pages** — Allure publish on main push only (`always()` so failed tests still deploy the report)
+4. **Pages** — Allure on main/master **push** or **Run workflow**. Site root is the latest report; last 5 are at `/archive.html` and `/runs/<run_number>/`.
 
 ### Configuration
 
@@ -110,17 +110,17 @@ Optional `.env` overrides: `TEST_ENV`, `BASE_URL`, `QA_TEST_OTP`, `CONVEX_DEPLOY
 
 - **Playwright UI job → Summary** — pass/fail table and failure messages
 - **Artifacts** — download `allure-report-combined` / per-browser artifacts; open `index.html`
-- **publish-allure job → Summary** — GitHub Pages URL when Pages is configured (main only)
+- **publish-allure / Pages job → Summary** — live URL on `main` (push or Run workflow). Latest at `/`; last 5 at `/archive.html`
 - **Traces** — from the artifact / Allure attachment, run `npx playwright show-trace <file.zip>`
 
 ### One-time GitHub Pages setup (Allure live URL)
 
-The combined Allure report is always uploaded as the **`allure-report-combined`** artifact. To also publish a browsable URL on every `main` push:
+The combined Allure report is always uploaded as the **`allure-report-combined`** artifact. To also publish a browsable URL on every `main` push or manual run on `main`:
 
 1. Open **Settings → Pages** on the repository
 2. Under **Build and deployment**, set **Source** to **GitHub Actions**
 3. Re-run CI (or push a new commit to `main`)
 
-Expected URL: `https://<owner>.github.io/<repo>/` (for example `https://saurabhsrana.github.io/qa_automation/`)
+Expected URLs: `https://<owner>.github.io/<repo>/` (latest) and `https://<owner>.github.io/<repo>/archive.html` (last 5).
 
 Until Pages is enabled, the **Publish Allure (GitHub Pages)** job shows setup instructions in its Job Summary; the report itself is still available from artifacts.
