@@ -23,11 +23,7 @@ test.describe("Revance complete profile", () => {
       await allure.story(
         "User completes sign-up, profile questions, and sees the rewards dashboard",
       );
-      await allure.tags(
-        "completeprofile",
-        "smoke",
-        "regression",
-      );
+      await allure.tags("completeprofile", "smoke", "regression");
 
       await test.step("I am on the Revance Welcome page", async () => {
         await welcomePage.goto();

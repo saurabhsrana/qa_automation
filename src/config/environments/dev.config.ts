@@ -9,7 +9,8 @@ const devConfig: EnvironmentConfig = {
   oceBaseUrlnew: "https://revance-oce--fulldev.sandbox.my.site.com/s/login/",
   headlessUrl:
     "https://revance-oce--parcopy.sandbox.my.site.com/s/login/?ec=302&startURL=%2Fs%2F",
-  cdpUrl: "https://revance-loyalty-git-dev-revances-projects.vercel.app/welcome",
+  cdpUrl:
+    "https://revance-loyalty-git-dev-revances-projects.vercel.app/welcome",
   oceUsername: process.env.OCE_USERNAME?.trim() || "",
   ocePassword: process.env.OCE_PASSWORD?.trim() || "",
   ocePractice: process.env.OCE_PRACTICE?.trim() || "Pleasanton Dermatology",

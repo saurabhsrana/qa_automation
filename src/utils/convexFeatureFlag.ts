@@ -5,7 +5,13 @@ import { getEnvironmentConfig } from "../config/environmentResolver";
 /** Enrollment flow requires this Convex env var during test execution. */
 export const ENROLLMENT_AUTOMATION_FLAG = "FEATURE_AUTOMATION_ENABLED";
 
-const CONVEX_CLI = path.join(process.cwd(), "node_modules", "convex", "bin", "main.js");
+const CONVEX_CLI = path.join(
+  process.cwd(),
+  "node_modules",
+  "convex",
+  "bin",
+  "main.js",
+);
 const UNKNOWN_EXIT = "unknown";
 const UNKNOWN_ERROR = "unknown error";
 
