@@ -69,7 +69,8 @@
     "lint:fix": "eslint . --fix",
     "typecheck": "tsc --noEmit",
     "format": "prettier --write \"src/**/*.{ts,js}\" \"tests/**/*.{ts,js}\" \"playwright.config.ts\"",
-    "format:check": "prettier --check \"src/**/*.{ts,js}\" \"tests/**/*.{ts,js}\" \"playwright.config.ts\""
+    "format:check": "prettier --check \"src/**/*.{ts,js}\" \"tests/**/*.{ts,js}\" \"playwright.config.ts\"",
+    "prepare": "husky"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
@@ -84,6 +85,7 @@
     "eslint-plugin-playwright": "^2.10.4",
     "eslint-plugin-sonarjs": "^4.2.0",
     "globals": "^17.6.0",
+    "husky": "^9.1.7",
     "prettier": "^3.9.6",
     "typescript": "^5.8.3",
     "typescript-eslint": "^8.60.0"

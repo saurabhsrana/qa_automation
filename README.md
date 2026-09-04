@@ -67,14 +67,17 @@ allurerc.cjs
 
 Workflow: [`.github/workflows/ci.yml`](.github/workflows/ci.yml)
 
+Branching: `feature/*` → `develop` → `main`. PRs into `main` must come from `develop` (workflow **PR source guard**, required check **`PR source must be develop`**). See [CONTRIBUTING.md](CONTRIBUTING.md).
+
 ### What runs when
 
 | Event | Lint & typecheck | Playwright E2E + Allure | GitHub Pages |
 |-------|------------------|-------------------------|--------------|
-| Push to `main` / `master` | Yes | Yes (full matrix) | Yes (after combine) |
+| Push to `main` / `master` | Yes | Yes — **full suite** (release gate) | Yes (after combine) |
+| Push to `develop` | Yes | Yes — **`@smoke` only** | No |
 | Pull request (no label) | Yes | **Skipped** (neutral) | No |
-| Pull request + `ready-for-e2e` label | Yes | Yes | No (artifact + PR comment only) |
-| Manual **Run workflow** | Yes | Yes | Only if run on main |
+| Pull request + `ready-for-e2e` label | Yes | Yes — **`@smoke` only** | No (artifact + PR comment only) |
+| Manual **Run workflow** | Yes | Yes — `test_filter` (`@smoke` / `@regression` / empty = all) | Only if run on main |
 
 E2E hits a **shared QA environment**, so PR runs are gated behind the **`ready-for-e2e`** label to avoid colliding on shared test data.
 

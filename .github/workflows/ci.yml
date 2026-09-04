@@ -27,9 +27,9 @@ name: CI
 
 on:
   push:
-    branches: [main, master]
+    branches: [main, master, develop]
   pull_request:
-    branches: [main, master]
+    branches: [main, master, develop]
     types: [opened, synchronize, reopened, labeled, unlabeled]
   workflow_dispatch:
     inputs:
