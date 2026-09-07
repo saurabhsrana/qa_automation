@@ -18,7 +18,7 @@ feature/<short-name>
 
 Do **not** open a PR from `feature/*` into `main`. CI job **`PR source must be develop`** fails those PRs. Add that check as a required status on `main` in GitHub → Settings → Branches.
 
-Push to `develop` runs **smoke**. Push to `main` (or **Run workflow** on `main`) runs the **full suite** and publishes Allure to GitHub Pages (latest at `/`, last 5 at `/archive.html`).
+Push to `develop` runs **smoke**. Push to `main` (or **Run workflow** on `main`) runs the **full suite** and publishes Allure to GitHub Pages (catalog at `/`, latest at `/latest/`, last `REPORTS_TO_KEEP` at `/reports/<run>-<sha>/`).
 
 ## CI workflow (smoke vs regression)
 
@@ -29,7 +29,7 @@ Playwright native tags (`{ tag: ['@smoke', '@regression'] }`) drive which tests 
 | Pull request + **`ready-for-e2e`** | `--grep @smoke` | Unlabeled PRs still skip E2E (neutral). Convex enrollment flag + secrets unchanged. |
 | Push to **`develop`** | `--grep @smoke` | Automatic after lint. |
 | Push to **`main`** / **`master`** | Full suite (no `--grep`) | Release gate — every spec, including untagged tests. |
-| Manual **Run workflow** | `test_filter` input | Type `@smoke`, `@regression`, or leave empty for the full suite. |
+| Manual **Run workflow** | `tag` input (`environment` defaults to **uat**) | Type `@smoke`, `@regression`, or leave empty / `any` for the full suite. |
 
 ### Local equivalents
 

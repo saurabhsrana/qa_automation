@@ -4,24 +4,26 @@
 #   - Push to main/master → full regression suite (lint + E2E + Allure + Pages)
 #   - Push to develop → smoke only (@smoke)
 #   - Pull request → Lint & typecheck always; E2E smoke only with ready-for-e2e label
-#   - Manual run: GitHub → Actions → CI → Run workflow (optional test_filter --grep)
-#     Pages deploys on main/master for push and workflow_dispatch; last 5 reports kept under /runs/
+#   - Manual run: GitHub → Actions → CI → Run workflow
+#     Inputs: environment (qa | uat, default uat), tag (e.g. @smoke), enable_video
+#     Pages deploys on main/master for push and workflow_dispatch
+#     Last N reports on the gh-pages branch under /reports/<run>-<sha>/ (REPORTS_TO_KEEP)
 #
-# E2E tests hit a shared QA environment, so on PRs they are gated behind the
-# ready-for-e2e label to avoid multiple PRs colliding on shared test data.
-# Add the label on the PR sidebar to trigger E2E; new commits (synchronize) on
-# an already-labeled PR re-run E2E automatically. Removing the label skips E2E
-# on the next unlabeled/synchronize evaluation.
+# E2E tests hit a shared QA/UAT environment (default TEST_ENV=uat), so on PRs they
+# are gated behind the ready-for-e2e label to avoid multiple PRs colliding on
+# shared test data. Add the label on the PR sidebar to trigger E2E; new commits
+# (synchronize) on an already-labeled PR re-run E2E automatically. Removing the
+# label skips E2E on the next unlabeled/synchronize evaluation.
 #
-# QA targets from src/config/environments/qa.config.ts (TEST_ENV=qa) — baseUrl and otp; no GitHub secrets required.
+# Targets from src/config/environments/{qa,uat}.config.ts — baseUrl and otp.
 #
 # One-time GitHub Pages setup (for browsable Allure report):
-#   Settings → Pages → Build and deployment → Source: GitHub Actions
+#   Settings → Pages → Build and deployment → Source: Deploy from a branch → gh-pages / (root)
 #
 # After a run:
 #   - Playwright UI (chromium|firefox) jobs → Summary + per-browser artifacts
 #   - publish-allure → merges Allure results from all browsers, then GitHub Pages URL
-#     (Pages deploy is main/master only — push or manual Run workflow; develop never publishes)
+#     (Pages: gh-pages branch, main/master push or manual run; develop never publishes)
 #   - Manual "Run workflow" can set enable_video=true (sets PW_VIDEO=on) when motion matters
 #
 # Artifact retention: keep upload-artifact retention-days in sync (default 14 below).
@@ -36,14 +38,21 @@ on:
     types: [opened, synchronize, reopened, labeled, unlabeled]
   workflow_dispatch:
     inputs:
+      environment:
+        description: Target environment
+        type: choice
+        options:
+          - uat
+          - qa
+        default: uat
+      tag:
+        description: Playwright tag (e.g. @smoke or @regression). Leave empty or type any for the full suite.
+        type: string
+        default: ''
       enable_video:
         description: Record video on failure (larger artifacts; for animation/drag-drop debugging)
         type: boolean
         default: false
-      test_filter:
-        description: Playwright --grep (e.g. @smoke, @regression). Leave empty for the full suite.
-        type: string
-        default: ''
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
@@ -51,6 +60,9 @@ concurrency:
 
 permissions:
   contents: read
+
+env:
+  REPORTS_TO_KEEP: 5
 
 jobs:
   static-checks:
@@ -108,38 +120,52 @@ jobs:
       - name: Reset Allure folders
         run: npm run allure:clean
 
-      - name: Resolve Playwright grep
-        id: grep
+      - name: Resolve environment and tag
+        id: target
         env:
           EVENT_NAME: ${{ github.event_name }}
           REF_NAME: ${{ github.ref }}
-          MANUAL_FILTER: ${{ inputs.test_filter }}
+          MANUAL_ENV: ${{ inputs.environment }}
+          MANUAL_TAG: ${{ inputs.tag }}
         run: |
+          ENV="uat"
+          if [ "$EVENT_NAME" = "workflow_dispatch" ] && [ -n "$MANUAL_ENV" ]; then
+            ENV="$MANUAL_ENV"
+          fi
+          case "$ENV" in
+            qa|uat) ;;
+            *)
+              echo "Unsupported environment: $ENV (use qa or uat)"
+              exit 1
+              ;;
+          esac
+
           FILTER=""
           if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
-            FILTER="$MANUAL_FILTER"
+            TAG="$(printf '%s' "$MANUAL_TAG" | tr '[:upper:]' '[:lower:]' | xargs)"
+            case "$TAG" in
+              ""|any|all|"*") FILTER="" ;;
+              @*) FILTER="$TAG" ;;
+              *) FILTER="@$TAG" ;;
+            esac
           elif [ "$EVENT_NAME" = "pull_request" ]; then
             FILTER="@smoke"
           elif [ "$REF_NAME" = "refs/heads/develop" ]; then
             FILTER="@smoke"
           fi
+
           {
+            echo "test_env=$ENV"
             echo "filter=$FILTER"
           } >> "$GITHUB_OUTPUT"
+          echo "TEST_ENV=$ENV" >> "$GITHUB_ENV"
           {
-            echo "## Playwright filter"
+            echo "## Run target"
             echo ""
             echo "- Event: \`$EVENT_NAME\`"
-            echo "- Grep: \`${FILTER:-<all tests>}\`"
-          } >> "$GITHUB_STEP_SUMMARY"
-
-      - name: Log QA config source
-        run: |
-          {
-            echo "## QA config"
-            echo ""
+            echo "- Environment: \`$ENV\` → \`src/config/environments/${ENV}.config.ts\`"
+            echo "- Tag / grep: \`${FILTER:-<all tests>}\`"
             echo "- Browser matrix: \`${{ matrix.browser }}\`"
-            echo "- TEST_ENV: \`qa\` → \`src/config/environments/qa.config.ts\` (baseUrl, otp)"
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Playwright UI (--project=${{ matrix.browser }})
@@ -148,7 +174,7 @@ jobs:
         env:
           CI: true
           HEADLESS: 'true'
-          TEST_ENV: qa
+          TEST_ENV: ${{ steps.target.outputs.test_env }}
           BROWSER: ${{ matrix.browser }}
           PARALLEL_WORKERS: '1'
           # Enrollment tests (completeprofile) toggle FEATURE_AUTOMATION_ENABLED via Convex CLI.
@@ -160,7 +186,7 @@ jobs:
           VERCEL_PROTECTION_BYPASS_KEY: ${{ secrets.VERCEL_PROTECTION_BYPASS_KEY }}
           # push/PR: inputs.enable_video is unset → off. Manual run: enable_video checkbox.
           PW_VIDEO: ${{ inputs.enable_video == true && 'on' || 'off' }}
-          PW_GREP: ${{ steps.grep.outputs.filter }}
+          PW_GREP: ${{ steps.target.outputs.filter }}
         run: |
           set -o pipefail
           GREP_ARGS=()
@@ -267,7 +293,7 @@ jobs:
         with:
           path: reports/allure-history
           # Stable key per branch so Trend charts persist across CI runs.
-          key: allure-history-${{ github.ref_name }}
+          key: allure-history-${{ github.ref_name }}-${{ inputs.environment || 'uat' }}
           restore-keys: |
             allure-history-
 
@@ -282,8 +308,8 @@ jobs:
         env:
           ALLURE_BROWSERS: chromium,firefox
           ALLURE_OS: ${{ runner.os }}
-          TEST_ENV: qa
-          ALLURE_REPORT_URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/
+          TEST_ENV: ${{ inputs.environment || 'uat' }}
+          ALLURE_REPORT_URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/latest/
         run: |
           set -euo pipefail
           export ALLURE_NODE="$(node -v)"
@@ -355,11 +381,11 @@ jobs:
             if [ "$IS_PAGES_DEPLOY" = "true" ]; then
               echo "GitHub Pages deploy runs next (main/master push or manual Run workflow)."
               echo ""
-              echo "Latest: \`https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/\`"
+              echo "Catalog: \`https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/\`"
               echo ""
-              echo "Last 5: \`https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/archive.html\`"
+              echo "Latest Allure: \`https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/latest/\`"
               echo ""
-              echo "If Pages is not enabled yet: **Settings → Pages → Source: GitHub Actions**, then re-run CI."
+              echo "If Pages is not enabled yet: **Settings → Pages → Source: Deploy from a branch → gh-pages / (root)**, then re-run CI."
             else
               echo "Pages deploy skipped (not a main/master push or manual run) — see the **allure-report-combined** build artifact above."
               echo ""
@@ -417,7 +443,7 @@ jobs:
 
   publish-allure-pages:
     name: Publish Allure (GitHub Pages)
-    needs: [combine-allure, publish-allure]
+    needs: [playwright-ui, combine-allure, publish-allure]
     # always() is required: without it, GitHub skips this job when any upstream
     # dependency chain includes a failed Playwright matrix job — even if combine/publish succeeded.
     # main/master only: push or manual Run workflow (never PR / develop).
@@ -428,15 +454,22 @@ jobs:
       && needs.combine-allure.result == 'success'
     runs-on: ubuntu-latest
     permissions:
-      pages: write
-      id-token: write
+      contents: write
       actions: read
-      contents: read
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout default branch (scripts)
+        uses: actions/checkout@v4
+
+      - name: Checkout gh-pages (keep existing report folders)
+        uses: actions/checkout@v4
+        continue-on-error: true
+        with:
+          ref: gh-pages
+          path: gh-pages
+          fetch-depth: 0
+
+      - name: Ensure gh-pages working tree
+        run: mkdir -p gh-pages
 
       - name: Download combined Allure report
         uses: actions/download-artifact@v4
@@ -444,85 +477,67 @@ jobs:
           name: allure-report-combined
           path: artifact
 
-      - name: Restore previous Allure Pages site
-        uses: actions/cache/restore@v4
-        with:
-          path: site
-          key: allure-pages-site-${{ github.ref_name }}-${{ github.run_id }}
-          restore-keys: |
-            allure-pages-site-${{ github.ref_name }}-
-
-      - name: Assemble last-5 Allure site
+      - name: Add this run, prune to last N, write catalog
         id: site
         env:
-          ALLURE_PAGES_SITE: site
+          GH_PAGES_DIR: gh-pages
           ALLURE_REPORT_DIR: artifact
-          ALLURE_PAGES_KEEP: '5'
-        run: node scripts/prepare-allure-pages-site.js
+          REPORT_STATUS: ${{ needs.playwright-ui.result }}
+          REPORT_TIMESTAMP: ${{ github.event.head_commit.timestamp || github.event.repository.updated_at }}
+        run: |
+          if [ -z "$REPORT_TIMESTAMP" ]; then
+            REPORT_TIMESTAMP="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            export REPORT_TIMESTAMP
+          fi
+          node .github/scripts/update-allure-gh-pages.js
 
-      - name: Save Allure Pages site cache
-        uses: actions/cache/save@v4
-        with:
-          path: site
-          key: allure-pages-site-${{ github.ref_name }}-${{ github.run_id }}
+      - name: Drop nested .git before publish
+        run: rm -rf gh-pages/.git
 
-      - name: Setup Pages
-        id: pages
-        uses: actions/configure-pages@v5
-        continue-on-error: true
-
-      - name: Upload Allure site
-        id: upload
-        if: steps.pages.outcome == 'success'
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: site
-
-      - name: Deploy to GitHub Pages
+      - name: Publish gh-pages branch
         id: deployment
-        if: steps.pages.outcome == 'success'
-        uses: actions/deploy-pages@v4
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./gh-pages
+          publish_branch: gh-pages
+          # Full assembled tree (script already kept last N). force_orphan: false
+          # preserves commit history on gh-pages; do not use keep_files here or
+          # pruned /reports folders would come back.
+          force_orphan: false
+          user_name: github-actions[bot]
+          user_email: 41898282+github-actions[bot]@users.noreply.github.com
+          commit_message: "Allure ${{ github.run_number }}-${{ github.sha }}"
 
       - name: Allure report URL
         if: always()
         env:
-          PAGES_OUTCOME: ${{ steps.pages.outcome }}
           DEPLOY_OUTCOME: ${{ steps.deployment.outcome }}
-          PAGE_URL: ${{ steps.deployment.outputs.page_url }}
-          KEPT_RUNS: ${{ steps.site.outputs.kept }}
+          FOLDER: ${{ steps.site.outputs.folder }}
+          KEPT: ${{ steps.site.outputs.kept }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-          EXPECTED_PAGE_URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/
+          PAGES_BASE: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}
         run: |
           {
             echo "## Allure report publish"
             echo ""
-            if [ "$DEPLOY_OUTCOME" = "success" ] && [ -n "$PAGE_URL" ]; then
-              echo "Latest Allure (this run): [Open report]($PAGE_URL)"
+            if [ "$DEPLOY_OUTCOME" = "success" ]; then
+              echo "Catalog (last ${{ env.REPORTS_TO_KEEP }}): [Open]($PAGES_BASE/)"
               echo ""
-              echo "Last 5 reports: [archive.html](${PAGE_URL}archive.html)"
+              echo "Latest Allure: [Open]($PAGES_BASE/latest/)"
               echo ""
-              echo "This run folder: \`${PAGE_URL}runs/${{ github.run_number }}/\`"
+              echo "This run: [$PAGES_BASE/reports/${FOLDER}/]($PAGES_BASE/reports/${FOLDER}/)"
               echo ""
-              echo "Kept run numbers: \`${KEPT_RUNS:-${{ github.run_number }}}\`"
+              echo "Kept folders: \`${KEPT}\`"
+            else
+              echo "gh-pages push did not succeed (outcome: \`${DEPLOY_OUTCOME:-unknown}\`)."
               echo ""
-              echo "Raw URL: \`$PAGE_URL\`"
-            elif [ "$PAGES_OUTCOME" != "success" ]; then
-              echo "GitHub Pages is **not enabled** for this repository yet."
-              echo ""
-              echo "### One-time setup (required for live URL)"
-              echo "1. Open [Repository Settings → Pages](https://github.com/${{ github.repository }}/settings/pages)"
-              echo "2. Under **Build and deployment**, set **Source** to **GitHub Actions**"
-              echo "3. Re-run this workflow or push a new commit to \`main\`"
-              echo ""
-              echo "Expected URL after setup: \`$EXPECTED_PAGE_URL\`"
+              echo "### One-time setup"
+              echo "1. Open [Settings → Pages](https://github.com/${{ github.repository }}/settings/pages)"
+              echo "2. **Source:** Deploy from a branch → \`gh-pages\` / \`/\` (root)"
+              echo "3. Allow Actions to write (\`GITHUB_TOKEN\` contents: write is set on this job)"
               echo ""
               echo "### Report available now (artifact)"
               echo "Download [\`allure-report-combined\`]($RUN_URL#artifacts), unzip, and open \`index.html\`."
-            else
-              echo "GitHub Pages deploy did not succeed (outcome: \`${DEPLOY_OUTCOME:-unknown}\`)."
-              echo "Download **allure-report-combined** from [this run’s artifacts]($RUN_URL#artifacts)."
             fi
           } >> "$GITHUB_STEP_SUMMARY"
-          if [ "$PAGES_OUTCOME" != "success" ]; then
-            echo "::warning title=GitHub Pages not enabled::Enable Pages (Settings → Pages → GitHub Actions source) to publish the Allure report URL. The allure-report-combined artifact is still available."
-          fi

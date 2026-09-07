@@ -77,9 +77,9 @@ Branching: `feature/*` → `develop` → `main`. PRs into `main` must come from 
 | Push to `develop` | Yes | Yes — **`@smoke` only** | No |
 | Pull request (no label) | Yes | **Skipped** (neutral) | No |
 | Pull request + `ready-for-e2e` label | Yes | Yes — **`@smoke` only** | No (artifact + PR comment only) |
-| Manual **Run workflow** | Yes | Yes — `test_filter` (`@smoke` / `@regression` / empty = all) | Yes if the run is on `main` / `master` |
+| Manual **Run workflow** | Yes | Yes — `environment` (`uat` default, or `qa`) + `tag` (`@smoke` / `@regression` / empty or `any` = all) | Yes if the run is on `main` / `master` |
 
-E2E hits a **shared QA environment**, so PR runs are gated behind the **`ready-for-e2e`** label to avoid colliding on shared test data.
+E2E hits a **shared QA/UAT environment** (CI default **uat**), so PR runs are gated behind the **`ready-for-e2e`** label to avoid colliding on shared test data.
 
 **How to run E2E on a PR:** open the PR → right sidebar **Labels** → add `ready-for-e2e` (create the label once if it doesn’t exist). No need to use the Actions tab. Pushing new commits while the label is still present re-runs E2E automatically. Remove the label to skip E2E on later updates.
 
@@ -88,11 +88,11 @@ E2E hits a **shared QA environment**, so PR runs are gated behind the **`ready-f
 1. **Lint & typecheck** — ESLint, TypeScript, Prettier
 2. **Playwright UI** — chromium / firefox matrix (WebKit excluded — Vercel bot checkpoint; run locally via `npm run test:webkit`)
 3. **Reports** — Combine Allure, Job Summary, artifacts (14-day retention)
-4. **Pages** — Allure on main/master **push** or **Run workflow**. Site root is the latest report; last 5 are at `/archive.html` and `/runs/<run_number>/`.
+4. **Pages** — Allure on main/master **push** or **Run workflow**. Catalog at `/`; latest Allure at `/latest/`; last `REPORTS_TO_KEEP` (default 5) at `/reports/<run>-<sha>/`.
 
 ### Configuration
 
-Environment config lives in `src/config/environments/{dev,qa,uat}.config.ts`. Selection is via `getEnvironmentConfig()` (`TEST_ENV`: **dev | qa | uat**; default **qa** when unset). CI sets `TEST_ENV=qa` and uses repository secrets `CONVEX_DEPLOY_KEY_QA` / `CONVEX_DEPLOY_KEY_UAT` for enrollment flag automation.
+Environment config lives in `src/config/environments/{dev,qa,uat}.config.ts`. Selection is via `getEnvironmentConfig()` (`TEST_ENV`: **dev | qa | uat**; default **qa** locally when unset). CI defaults to **uat** (manual runs can pick `qa` or `uat`) and uses repository secrets `CONVEX_DEPLOY_KEY_QA` / `CONVEX_DEPLOY_KEY_UAT` for enrollment flag automation.
 
 At the start of each run, the console prints `Running against: QA (https://…)`. If `BASE_URL` in `.env` overrides the env default, a warning is logged.
 
@@ -104,13 +104,17 @@ Optional `.env` overrides: `TEST_ENV`, `BASE_URL`, `QA_TEST_OTP`, `VERCEL_PROTEC
 
 ### Manual run
 
-**Actions → CI → Run workflow** (uses `workflow_dispatch`). Optional checkbox: **enable_video** for failure videos.
+**Actions → CI → Run workflow** (uses `workflow_dispatch`):
+
+- **environment** — `uat` (default) or `qa`
+- **tag** — text, e.g. `@smoke` or `@regression`. Empty or `any` runs the full suite (`smoke` is normalized to `@smoke`)
+- **enable_video** — optional failure videos
 
 ### Reading results
 
 - **Playwright UI job → Summary** — pass/fail table and failure messages
 - **Artifacts** — download `allure-report-combined` / per-browser artifacts; open `index.html`
-- **publish-allure / Pages job → Summary** — live URL on `main` (push or Run workflow). Latest at `/`; last 5 at `/archive.html`
+- **publish-allure / Pages job → Summary** — live URL on `main` (push or Run workflow). Catalog at `/`; latest Allure at `/latest/`
 - **Traces** — from the artifact / Allure attachment, run `npx playwright show-trace <file.zip>`
 
 ### One-time GitHub Pages setup (Allure live URL)
@@ -118,9 +122,9 @@ Optional `.env` overrides: `TEST_ENV`, `BASE_URL`, `QA_TEST_OTP`, `VERCEL_PROTEC
 The combined Allure report is always uploaded as the **`allure-report-combined`** artifact. To also publish a browsable URL on every `main` push or manual run on `main`:
 
 1. Open **Settings → Pages** on the repository
-2. Under **Build and deployment**, set **Source** to **GitHub Actions**
+2. Under **Build and deployment**, set **Source** to **Deploy from a branch** → `gh-pages` / `/` (root)
 3. Re-run CI (or push a new commit to `main`)
 
-Expected URLs: `https://<owner>.github.io/<repo>/` (latest) and `https://<owner>.github.io/<repo>/archive.html` (last 5).
+Expected URLs: `https://<owner>.github.io/<repo>/` (catalog), `/latest/` (newest Allure), `/reports/<run>-<sha>/` (one run).
 
 Until Pages is enabled, the **Publish Allure (GitHub Pages)** job shows setup instructions in its Job Summary; the report itself is still available from artifacts.
