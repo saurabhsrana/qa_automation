@@ -156,6 +156,8 @@ jobs:
           # (must match convexDeployment in the active env config).
           CONVEX_DEPLOY_KEY_QA: ${{ secrets.CONVEX_DEPLOY_KEY_QA }}
           CONVEX_DEPLOY_KEY_UAT: ${{ secrets.CONVEX_DEPLOY_KEY_UAT }}
+          # Verified 2026-09-07: QA and UAT share one Vercel project — one bypass secret.
+          VERCEL_PROTECTION_BYPASS_KEY: ${{ secrets.VERCEL_PROTECTION_BYPASS_KEY }}
           # push/PR: inputs.enable_video is unset → off. Manual run: enable_video checkbox.
           PW_VIDEO: ${{ inputs.enable_video == true && 'on' || 'off' }}
           PW_GREP: ${{ steps.grep.outputs.filter }}

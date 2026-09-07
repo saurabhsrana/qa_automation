@@ -2,6 +2,7 @@ import os from "node:os";
 import { defineConfig, devices } from "@playwright/test";
 import { getEnvironmentConfig } from "./src/config/environmentResolver";
 import { shouldRunHeadless } from "./src/config/browser.factory";
+import { vercelBypassHttpHeaders } from "./src/utils/vercelProtectionBypass";
 
 const config = getEnvironmentConfig();
 
@@ -64,6 +65,7 @@ export default defineConfig({
   ],
   use: {
     baseURL: config.baseUrl,
+    extraHTTPHeaders: vercelBypassHttpHeaders(),
     headless: shouldRunHeadless(),
     // Traces cover most debugging needs cheaply (and still attach to Allure on
     // failure). Video is opt-in via PW_VIDEO=on — e.g. a manual workflow_dispatch

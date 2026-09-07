@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { type Locator, type Page, expect } from "@playwright/test";
 import { getEnvironmentConfig } from "../config/environmentResolver";
+import { withVercelBypassQuery } from "../utils/vercelProtectionBypass";
 
 /**
  * Shared Page Object base — navigation, waits, and safe interactions.
@@ -21,7 +22,7 @@ export abstract class BasePage {
       timeout?: number;
     },
   ): Promise<void> {
-    await this.page.goto(url, {
+    await this.page.goto(withVercelBypassQuery(url), {
       waitUntil: options?.waitUntil ?? "domcontentloaded",
       timeout: options?.timeout,
     });

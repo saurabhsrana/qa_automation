@@ -96,7 +96,7 @@ Environment config lives in `src/config/environments/{dev,qa,uat}.config.ts`. Se
 
 At the start of each run, the console prints `Running against: QA (https://…)`. If `BASE_URL` in `.env` overrides the env default, a warning is logged.
 
-Optional `.env` overrides: `TEST_ENV`, `BASE_URL`, `QA_TEST_OTP`, `CONVEX_DEPLOY_KEY_QA`, `CONVEX_DEPLOY_KEY_UAT`, `CONVEX_DEPLOYMENT` (see `.env.example`).
+Optional `.env` overrides: `TEST_ENV`, `BASE_URL`, `QA_TEST_OTP`, `VERCEL_PROTECTION_BYPASS_KEY`, `CONVEX_DEPLOY_KEY_QA`, `CONVEX_DEPLOY_KEY_UAT`, `CONVEX_DEPLOYMENT` (see `.env.example`).
 
 **Enrollment tests (`completeprofile.spec.ts`)** temporarily set Convex `FEATURE_AUTOMATION_ENABLED=true` via `npx convex env set` before the spec and restore the original value after (pass or fail). Requires `convexDeployment` in the active env config (or `CONVEX_DEPLOYMENT` override) and local `npx convex login` or a deploy key: `CONVEX_DEPLOY_KEY_QA` when `TEST_ENV=qa`, `CONVEX_DEPLOY_KEY_UAT` when `TEST_ENV=uat`.
 
