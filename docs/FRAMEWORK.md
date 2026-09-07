@@ -35,7 +35,7 @@ npm run allure:report
 
 - `TEST_ENV` → `src/config/environments/{dev|qa|uat}.config.ts` via `getEnvironmentConfig()` (default **qa**; throws on invalid values)
 - Optional overrides via `.env` (`BASE_URL` logs a startup warning when it differs from the env default; `QA_TEST_OTP`)
-- CI runs **chromium + firefox** only (WebKit excluded — Vercel bot checkpoint on QA). Opt-in locally: `npm run test:webkit` (`INCLUDE_WEBKIT=true`)
+- CI and local UI tests run **chromium** only
 - Report UI: Allure 3 **`allure2`** plugin (classic Overview home) with `singleFile: true` — no deep-link away from Overview
 
 ## Commands

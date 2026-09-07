@@ -120,7 +120,7 @@ const indexHtml = `<!DOCTYPE html>
 </head>
 <body>
   <h1>Allure reports</h1>
-  <p>Keeping the last ${KEEP} CI publishes. Combined Chromium + Firefox results.</p>
+  <p>Keeping the last ${KEEP} CI publishes. Chromium results.</p>
   <p><a class="latest" href="${escapeHtml(latestHref)}">Open latest report</a></p>
   <table>
     <thead>

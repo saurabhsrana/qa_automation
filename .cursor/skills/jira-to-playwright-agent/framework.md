@@ -13,7 +13,7 @@ tests/ui/                   # active Playwright specs
 tests/api/                  # reserved
 src/page-objects/           # POM
 src/fixtures/               # loyalty.fixture.ts
-src/config/                 # env + browser.factory
+src/config/                 # env
 src/data/                   # constants.json
 docs/api-enrollment-endpoints-reference.md
 ```

@@ -21,8 +21,8 @@
 #   Settings → Pages → Build and deployment → Source: Deploy from a branch → gh-pages / (root)
 #
 # After a run:
-#   - Playwright UI (chromium|firefox) jobs → Summary + per-browser artifacts
-#   - publish-allure → merges Allure results from all browsers, then GitHub Pages URL
+#   - Playwright UI (chromium) → Summary + artifacts
+#   - publish-allure → Allure report from chromium results, then GitHub Pages URL
 #     (Pages: gh-pages branch, main/master push or manual run; develop never publishes)
 #   - Manual "Run workflow" can set enable_video=true (sets PW_VIDEO=on) when motion matters
 #
@@ -88,7 +88,7 @@ jobs:
         run: npm run format:check
 
   playwright-ui:
-    name: Playwright UI (${{ matrix.browser }})
+    name: Playwright UI
     needs: static-checks
     # Push / workflow_dispatch: always run E2E after lint.
     # pull_request: only when the PR has the ready-for-e2e label (skipped otherwise → neutral check).
@@ -99,11 +99,6 @@ jobs:
           && contains(github.event.pull_request.labels.*.name, 'ready-for-e2e'))
     runs-on: ubuntu-latest
     timeout-minutes: 60
-    strategy:
-      fail-fast: false
-      matrix:
-        # WebKit omitted: Vercel Security Checkpoint (Code 21) blocks headless WebKit without bypass.
-        browser: [chromium, firefox]
     steps:
       - uses: actions/checkout@v4
 
@@ -114,8 +109,8 @@ jobs:
 
       - run: npm ci
 
-      - name: Install Playwright browser (${{ matrix.browser }})
-        run: npx playwright install --with-deps ${{ matrix.browser }}
+      - name: Install Playwright browser (chromium)
+        run: npx playwright install --with-deps chromium
 
       - name: Reset Allure folders
         run: npm run allure:clean
@@ -165,17 +160,17 @@ jobs:
             echo "- Event: \`$EVENT_NAME\`"
             echo "- Environment: \`$ENV\` → \`src/config/environments/${ENV}.config.ts\`"
             echo "- Tag / grep: \`${FILTER:-<all tests>}\`"
-            echo "- Browser matrix: \`${{ matrix.browser }}\`"
+            echo "- Browser: \`chromium\`"
           } >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Playwright UI (--project=${{ matrix.browser }})
+      - name: Playwright UI (--project=chromium)
         id: playwright
         continue-on-error: true
         env:
           CI: true
           HEADLESS: 'true'
           TEST_ENV: ${{ steps.target.outputs.test_env }}
-          BROWSER: ${{ matrix.browser }}
+          BROWSER: chromium
           PARALLEL_WORKERS: '1'
           # Enrollment tests (completeprofile) toggle FEATURE_AUTOMATION_ENABLED via Convex CLI.
           # convexFeatureFlag.ts maps TEST_ENV → CONVEX_DEPLOY_KEY_QA / CONVEX_DEPLOY_KEY_UAT
@@ -195,14 +190,14 @@ jobs:
           fi
           {
             echo "### Playwright --list"
-            npx playwright test --project=${{ matrix.browser }} --list "${GREP_ARGS[@]}" || true
+            npx playwright test --project=chromium --list "${GREP_ARGS[@]}" || true
             echo ""
             echo "### Playwright run"
-            npx playwright test --project=${{ matrix.browser }} --retries=1 "${GREP_ARGS[@]}"
+            npx playwright test --project=chromium --retries=1 "${GREP_ARGS[@]}"
           } 2>&1 | tee playwright-ci.log
           status=${PIPESTATUS[0]}
           {
-            echo "## Playwright console (tail) — ${{ matrix.browser }}"
+            echo "## Playwright console (tail) — chromium"
             echo ""
             echo '```'
             tail -n 80 playwright-ci.log || true
@@ -214,7 +209,7 @@ jobs:
         if: always()
         run: |
           {
-            echo "## Playwright last-run (${{ matrix.browser }})"
+            echo "## Playwright last-run (chromium)"
             echo ""
             if [ -f test-results/.last-run.json ]; then
               echo '```json'
@@ -229,7 +224,7 @@ jobs:
             ls -la tests/ui || true
           } >> "$GITHUB_STEP_SUMMARY"
 
-      - name: Generate per-browser Allure report (artifact only)
+      - name: Generate Allure report (artifact only)
         if: always()
         run: npm run allure:generate
         continue-on-error: true
@@ -237,23 +232,23 @@ jobs:
       - name: GitHub Job Summary
         if: always()
         env:
-          BROWSER: ${{ matrix.browser }}
+          BROWSER: chromium
         run: npm run ci:summary
 
-      - name: Upload Allure raw results (${{ matrix.browser }})
+      - name: Upload Allure raw results (chromium)
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: allure-results-${{ matrix.browser }}
+          name: allure-results-chromium
           path: reports/allure-results/
           retention-days: 14
           if-no-files-found: warn
 
-      - name: Upload Playwright failure artifacts (${{ matrix.browser }})
+      - name: Upload Playwright failure artifacts (chromium)
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-ui-${{ matrix.browser }}-artifacts
+          name: playwright-ui-chromium-artifacts
           path: |
             reports/allure-report/
             reports/traces/
@@ -271,7 +266,7 @@ jobs:
   combine-allure:
     name: Combine Allure report
     needs: playwright-ui
-    # always(): still combine when the UI matrix fails so the report includes failures.
+    # always(): still generate when Playwright UI fails so the report includes failures.
     # Skip when Playwright was skipped (no ready-for-e2e on PR, lint failed, or cancelled).
     if: always() && (needs.playwright-ui.result == 'success' || needs.playwright-ui.result == 'failure')
     runs-on: ubuntu-latest
@@ -297,16 +292,15 @@ jobs:
           restore-keys: |
             allure-history-
 
-      - name: Download Allure results from all browsers
+      - name: Download Chromium Allure results
         uses: actions/download-artifact@v4
         with:
-          pattern: allure-results-*
+          name: allure-results-chromium
           path: allure-inbox
-          merge-multiple: false
 
-      - name: Merge Allure results and generate combined report
+      - name: Generate Allure report
         env:
-          ALLURE_BROWSERS: chromium,firefox
+          ALLURE_BROWSERS: chromium
           ALLURE_OS: ${{ runner.os }}
           TEST_ENV: ${{ inputs.environment || 'uat' }}
           ALLURE_REPORT_URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/latest/
@@ -381,9 +375,9 @@ jobs:
             if [ "$IS_PAGES_DEPLOY" = "true" ]; then
               echo "GitHub Pages deploy runs next (main/master push or manual Run workflow)."
               echo ""
-              echo "Catalog: \`https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/\`"
+              echo "Catalog: [https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/](https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/)"
               echo ""
-              echo "Latest Allure: \`https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/latest/\`"
+              echo "Latest Allure: [https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/latest/](https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/latest/)"
               echo ""
               echo "If Pages is not enabled yet: **Settings → Pages → Source: Deploy from a branch → gh-pages / (root)**, then re-run CI."
             else
@@ -391,7 +385,7 @@ jobs:
               echo ""
               echo "After download: unzip and open \`index.html\` in a browser."
               echo ""
-              echo "Per-browser extras: \`allure-results-*\` and \`playwright-ui-*-artifacts\`."
+              echo "Also available: \`allure-results-chromium\` and \`playwright-ui-chromium-artifacts\`."
             fi
             echo ""
             echo "### Files in artifact"
@@ -416,7 +410,7 @@ jobs:
               '2. Download **`allure-report-combined`**',
               '3. Unzip and open **`index.html`**',
               '',
-              '_Also available: `allure-results-*` and `playwright-ui-*-artifacts` per browser._',
+              '_Also available: `allure-results-chromium` and `playwright-ui-chromium-artifacts`._',
             ].join('\n');
             const { data: comments } = await github.rest.issues.listComments({
               owner: context.repo.owner,
@@ -445,7 +439,7 @@ jobs:
     name: Publish Allure (GitHub Pages)
     needs: [playwright-ui, combine-allure, publish-allure]
     # always() is required: without it, GitHub skips this job when any upstream
-    # dependency chain includes a failed Playwright matrix job — even if combine/publish succeeded.
+    # dependency chain includes a failed Playwright UI job — even if combine/publish succeeded.
     # main/master only: push or manual Run workflow (never PR / develop).
     if: >-
       always()
@@ -453,6 +447,13 @@ jobs:
       && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
       && needs.combine-allure.result == 'success'
     runs-on: ubuntu-latest
+    # Restores the clickable URL on the workflow graph (same as actions/deploy-pages).
+    environment:
+      name: github-pages
+      url: ${{ steps.urls.outputs.latest_url }}
+    outputs:
+      latest_url: ${{ steps.urls.outputs.latest_url }}
+      catalog_url: ${{ steps.urls.outputs.catalog_url }}
     permissions:
       contents: write
       actions: read
@@ -491,6 +492,22 @@ jobs:
           fi
           node .github/scripts/update-allure-gh-pages.js
 
+      - name: Resolve Allure Pages URLs
+        id: urls
+        env:
+          OWNER: ${{ github.repository_owner }}
+          REPO: ${{ github.event.repository.name }}
+          FOLDER: ${{ steps.site.outputs.folder }}
+        run: |
+          OWNER_LC="$(printf '%s' "$OWNER" | tr '[:upper:]' '[:lower:]')"
+          BASE="https://${OWNER_LC}.github.io/${REPO}"
+          {
+            echo "pages_base=${BASE}"
+            echo "catalog_url=${BASE}/"
+            echo "latest_url=${BASE}/latest/"
+            echo "run_url=${BASE}/reports/${FOLDER}/"
+          } >> "$GITHUB_OUTPUT"
+
       - name: Drop nested .git before publish
         run: rm -rf gh-pages/.git
 
@@ -513,22 +530,21 @@ jobs:
         if: always()
         env:
           DEPLOY_OUTCOME: ${{ steps.deployment.outcome }}
-          FOLDER: ${{ steps.site.outputs.folder }}
+          CATALOG_URL: ${{ steps.urls.outputs.catalog_url }}
+          LATEST_URL: ${{ steps.urls.outputs.latest_url }}
+          THIS_RUN_URL: ${{ steps.urls.outputs.run_url }}
           KEPT: ${{ steps.site.outputs.kept }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-          PAGES_BASE: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}
         run: |
           {
-            echo "## Allure report publish"
+            echo "## Allure report"
             echo ""
-            if [ "$DEPLOY_OUTCOME" = "success" ]; then
-              echo "Catalog (last ${{ env.REPORTS_TO_KEEP }}): [Open]($PAGES_BASE/)"
+            if [ "$DEPLOY_OUTCOME" = "success" ] && [ -n "$LATEST_URL" ]; then
+              echo "**Latest Allure:** [${LATEST_URL}](${LATEST_URL})"
               echo ""
-              echo "Latest Allure: [Open]($PAGES_BASE/latest/)"
-              echo ""
-              echo "This run: [$PAGES_BASE/reports/${FOLDER}/]($PAGES_BASE/reports/${FOLDER}/)"
-              echo ""
-              echo "Kept folders: \`${KEPT}\`"
+              echo "- **Catalog (last ${{ env.REPORTS_TO_KEEP }}):** [${CATALOG_URL}](${CATALOG_URL})"
+              echo "- **This run:** [${THIS_RUN_URL}](${THIS_RUN_URL})"
+              echo "- Kept folders: \`${KEPT}\`"
             else
               echo "gh-pages push did not succeed (outcome: \`${DEPLOY_OUTCOME:-unknown}\`)."
               echo ""
@@ -541,3 +557,6 @@ jobs:
               echo "Download [\`allure-report-combined\`]($RUN_URL#artifacts), unzip, and open \`index.html\`."
             fi
           } >> "$GITHUB_STEP_SUMMARY"
+          if [ "$DEPLOY_OUTCOME" = "success" ] && [ -n "$LATEST_URL" ]; then
+            echo "::notice title=Allure report::${LATEST_URL}"
+          fi

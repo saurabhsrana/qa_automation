@@ -60,7 +60,7 @@ function writeExecutor() {
 
 function writeEnvironment() {
   const lines = [
-    `Browsers=${process.env.ALLURE_BROWSERS || "chromium,firefox"}`,
+    `Browsers=${process.env.ALLURE_BROWSERS || "chromium"}`,
     `OS=${process.env.ALLURE_OS || process.env.RUNNER_OS || os.platform()}`,
     `Base_URL=${process.env.ALLURE_BASE_URL_DISPLAY || resolveBaseUrl() || "(configured via TEST_ENV)"}`,
     `Node=${process.env.ALLURE_NODE || process.version}`,

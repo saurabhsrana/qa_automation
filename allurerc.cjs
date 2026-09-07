@@ -44,7 +44,7 @@ module.exports = {
     ],
   },
   variables: {
-    Browsers: process.env.ALLURE_BROWSERS || "chromium,firefox",
+    Browsers: process.env.ALLURE_BROWSERS || "chromium",
     OS: process.env.ALLURE_OS || process.env.RUNNER_OS || process.platform,
     Base_URL:
       process.env.ALLURE_BASE_URL_DISPLAY ||

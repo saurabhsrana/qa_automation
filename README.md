@@ -54,7 +54,7 @@ tests/ui/      welcome.spec.ts, completeprofile.spec.ts
 tests/api/     reserved (README only until contract-verified rewrite)
 src/page-objects/  WelcomePage, SignupPage, BasePage, PhoneOtpFormComponent
 src/fixtures/  loyalty.fixture.ts, enrollment.fixture.ts (Convex flag for enrollment)
-src/config/    environmentResolver, environments/{dev,qa,uat}.config.ts, oceAuth, browser.factory
+src/config/    environmentResolver, environments/{dev,qa,uat}.config.ts, oceAuth
 src/data/      constants.json (static test data)
 src/utils/     testData.ts (dynamic helpers), logger.ts
 docs/          FRAMEWORK.md, api-enrollment-endpoints-reference.md
@@ -86,7 +86,7 @@ E2E hits a **shared QA/UAT environment** (CI default **uat**), so PR runs are ga
 ### Pipeline steps (when E2E runs)
 
 1. **Lint & typecheck** — ESLint, TypeScript, Prettier
-2. **Playwright UI** — chromium / firefox matrix (WebKit excluded — Vercel bot checkpoint; run locally via `npm run test:webkit`)
+2. **Playwright UI** — chromium
 3. **Reports** — Combine Allure, Job Summary, artifacts (14-day retention)
 4. **Pages** — Allure on main/master **push** or **Run workflow**. Catalog at `/`; latest Allure at `/latest/`; last `REPORTS_TO_KEEP` (default 5) at `/reports/<run>-<sha>/`.
 
@@ -100,7 +100,7 @@ Optional `.env` overrides: `TEST_ENV`, `BASE_URL`, `QA_TEST_OTP`, `VERCEL_PROTEC
 
 **Enrollment tests (`completeprofile.spec.ts`)** temporarily set Convex `FEATURE_AUTOMATION_ENABLED=true` via `npx convex env set` before the spec and restore the original value after (pass or fail). Requires `convexDeployment` in the active env config (or `CONVEX_DEPLOYMENT` override) and local `npx convex login` or a deploy key: `CONVEX_DEPLOY_KEY_QA` when `TEST_ENV=qa`, `CONVEX_DEPLOY_KEY_UAT` when `TEST_ENV=uat`.
 
-**Browser matrix:** Default runs use **chromium + firefox** only. WebKit is excluded (Vercel bot checkpoint). Raw `playwright test` without `--project` also skips WebKit. To run WebKit explicitly: `npm run test:webkit`.
+**Browser:** UI tests run on **chromium** only.
 
 ### Manual run
 

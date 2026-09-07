@@ -1,38 +1,22 @@
 import os from "node:os";
 import { defineConfig, devices } from "@playwright/test";
 import { getEnvironmentConfig } from "./src/config/environmentResolver";
-import { shouldRunHeadless } from "./src/config/browser.factory";
 import { vercelBypassHttpHeaders } from "./src/utils/vercelProtectionBypass";
 
 const config = getEnvironmentConfig();
 
 const uiTestDir = "./tests/ui";
 
-/** WebKit is opt-in only (`INCLUDE_WEBKIT=true` / `npm run test:webkit`) — Vercel blocks headless WebKit. */
-const uiProjects = [
-  {
-    name: "chromium",
-    testDir: uiTestDir,
-    use: { ...devices["Desktop Chrome"] },
-  },
-  {
-    name: "firefox",
-    testDir: uiTestDir,
-    use: { ...devices["Desktop Firefox"] },
-  },
-];
-
-if (process.env.INCLUDE_WEBKIT === "true") {
-  uiProjects.push({
-    name: "webkit",
-    testDir: uiTestDir,
-    use: { ...devices["Desktop Safari"] },
-  });
+/** Headed locally by default; headless when HEADLESS=true or CI (unless HEADED=true). */
+function shouldRunHeadless(): boolean {
+  if (process.env.HEADED === "true") return false;
+  if (process.env.HEADLESS === "true") return true;
+  return !!process.env.CI;
 }
 
 /**
- * Playwright Test runner — UI specs under tests/ui (chromium + firefox by default);
- * API folder reserved (empty). WebKit: set INCLUDE_WEBKIT=true or npm run test:webkit.
+ * Playwright Test runner — UI specs under tests/ui (chromium only);
+ * API folder reserved (empty).
  */
 export default defineConfig({
   globalSetup: "./tests/global-setup.ts",
@@ -57,7 +41,7 @@ export default defineConfig({
           os_platform: os.platform(),
           os_release: os.release(),
           node_version: process.version,
-          browser: process.env.BROWSER || "chromium",
+          browser: "chromium",
           test_env: config.env,
         },
       },
@@ -77,7 +61,11 @@ export default defineConfig({
     navigationTimeout: 60_000,
   },
   projects: [
-    ...uiProjects,
+    {
+      name: "chromium",
+      testDir: uiTestDir,
+      use: { ...devices["Desktop Chrome"] },
+    },
     {
       name: "api",
       testDir: "./tests/api",
